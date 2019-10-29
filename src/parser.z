@@ -1,0 +1,598 @@
+struct ParsingContext {
+  current_token: u64,
+  tokens: *Token,
+  num_tokens: u64,
+}
+
+fn is_done_parsing(ctx: *ParsingContext) -> bool {
+  return ctx.num_tokens == ctx.current_token;
+}
+
+fn accept(ctx: *ParsingContext, token: TokenKind) -> bool {
+  var tok : Token = ctx.tokens[ctx.current_token];
+  if !is_done_parsing(ctx) && tok.kind == token {
+    ctx.current_token = ctx.current_token + 1;
+    return true;
+  }
+  return false;
+}
+
+fn expect(ctx: *ParsingContext, token: TokenKind) -> bool {
+  if accept(ctx, token) {
+    return true;
+  } else {
+    val tok: Token = ctx.tokens[ctx.current_token];
+    printf("Expected %d but got %d on line %d\n", token, tok.kind, tok.position);
+    abort();
+  }
+}
+
+fn look_ahead(ctx: *ParsingContext, offset: u64) -> Token {
+  if ctx.current_token == ctx.num_tokens {
+    var eof_tok: Token;
+    eof_tok.kind = EOF;
+    return eof_tok;
+  } else  return ctx.tokens[ctx.current_token + offset];
+}
+
+fn consume(ctx: *ParsingContext) -> Token {
+  ctx.current_token = ctx.current_token + 1;
+  return ctx.tokens[ctx.current_token - 1];
+}
+
+fn parse_path(ctx: *ParsingContext, tok: Token) -> AstPath {
+  var path: AstPath;
+  path.segments = malloc(8 * 4);
+  path.num_segments = 0;
+
+  while true {
+    if tok.kind != TokenKind::Identifier {
+      printf("Expected identifier in path but got %u on line %u\n", tok.kind, tok.position);
+      abort();
+    }
+    path.num_segments = path.num_segments + 1;
+    path.segments[path.num_segments - 1] = tok.lexeme;
+    if !accept(ctx, TokenKind::ColonColon)  break;
+    tok = consume(ctx);
+  }
+  return path;
+}
+
+fn parse_type(ctx: *ParsingContext) -> *AstType {
+  var node: AstTypeNode;
+  var kind: AstTypeKind;
+
+  val token: Token = consume(ctx);
+  if token.kind == TokenKind::Identifier {
+    kind = AstTypeKind::Path;
+    node.path = token.lexeme; //parse_path(ctx, token);
+  } else if token.kind == TokenKind::Star {
+    kind = AstTypeKind::Ptr;
+    node.ptr = parse_type(ctx);
+  } else {
+    printf("Expected type but got %d on line %d", token.kind, token.position);
+    abort();
+  }
+  
+  var type: *AstType = malloc(sizeof(AstType));
+  type.kind = kind;
+  type.node = node;
+
+  return type;
+}
+
+fn convert_token_to_binary_operator(tok: TokenKind) -> BinaryOperatorKind {
+  if tok == TokenKind::Plus  return BinaryOperatorKind::Addition;
+  else if tok == TokenKind::Minus  return BinaryOperatorKind::Subtraction;
+  else if tok == TokenKind::Star  return BinaryOperatorKind::Product;
+  else if tok == TokenKind::Slash  return BinaryOperatorKind::Division;
+  else if tok == TokenKind::Percent  return BinaryOperatorKind::Modulus;
+  else if tok == TokenKind::Less  return BinaryOperatorKind::Less;
+  else if tok == TokenKind::LessEqual  return BinaryOperatorKind::LessEq;
+  else if tok == TokenKind::Greater  return BinaryOperatorKind::Greater;
+  else if tok == TokenKind::GreaterEqual  return BinaryOperatorKind::GreaterEq;
+  else if tok == TokenKind::EqualEqual  return BinaryOperatorKind::Equality;
+  else if tok == TokenKind::BangEqual  return BinaryOperatorKind::NotEq;
+  else if tok == TokenKind::AndAnd  return BinaryOperatorKind::And;
+  else if tok == TokenKind::OrOr  return BinaryOperatorKind::Or;
+  else if tok == TokenKind::And  return BinaryOperatorKind::BAnd;
+  else if tok == TokenKind::Or  return BinaryOperatorKind::BOr;
+  else if tok == TokenKind::Hat  return BinaryOperatorKind::Xor;
+  else if tok == TokenKind::LessLess  return BinaryOperatorKind::LeftShift;
+  else if tok == TokenKind::GreaterGreater  return BinaryOperatorKind::RightShift;
+  else  return BinaryOperatorKind::Invalid;
+}
+
+fn get_binary_operator_precedence(op: BinaryOperatorKind) -> u32 {
+  if op == BinaryOperatorKind::Product  return 10;
+  else if op == BinaryOperatorKind::Division  return 10;
+  else if op == BinaryOperatorKind::Modulus  return 10;
+  else if op == BinaryOperatorKind::Addition  return 9;
+  else if op == BinaryOperatorKind::Subtraction  return 9;
+  else if op == BinaryOperatorKind::LeftShift  return 8;
+  else if op == BinaryOperatorKind::RightShift  return 8;
+  else if op == BinaryOperatorKind::BAnd  return 7;
+  else if op == BinaryOperatorKind::Xor  return 6;
+  else if op == BinaryOperatorKind::BOr  return 5;
+  else if op == BinaryOperatorKind::Less  return 4;
+  else if op == BinaryOperatorKind::LessEq  return 4;
+  else if op == BinaryOperatorKind::Greater  return 4;
+  else if op == BinaryOperatorKind::GreaterEq  return 4;
+  else if op == BinaryOperatorKind::Equality  return 4;
+  else if op == BinaryOperatorKind::NotEq  return 4;
+  else if op == BinaryOperatorKind::And  return 3;
+  else if op == BinaryOperatorKind::Or  return 2;
+  else return 0;
+}
+
+fn get_current_precedence(ctx: *ParsingContext) -> u32 {
+
+  if ctx.num_tokens <= ctx.current_token {
+    return 0;
+  } else {
+    var tok : Token = ctx.tokens[ctx.current_token];
+    var op_precedence: u32 = get_binary_operator_precedence(convert_token_to_binary_operator(tok.kind));
+    if op_precedence > 0  return op_precedence;
+    else if tok.kind == TokenKind::Dot  return 13;
+    else if (tok.kind == TokenKind::LeftBracket || tok.kind == TokenKind::LeftParen)  return 12;
+    else  return 0;
+  }
+}
+
+fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *AstExpr
+
+fn parse_integer_literal(ctx: *ParsingContext, tok: Token) -> *AstExpr {
+  var expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Literal;
+  expr.node.literal.kind = LiteralKind::Int;
+  expr.node.literal.value.integer = atoi(tok.lexeme);
+  return expr;
+}
+
+fn parse_float_literal(ctx: *ParsingContext, tok: Token) -> *AstExpr {
+  var expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Literal;
+  expr.node.literal.kind = LiteralKind::Float;
+  expr.node.literal.value.floating = atof(tok.lexeme);
+  return expr;
+}
+
+fn parse_char_literal(ctx: *ParsingContext, tok: Token) -> *AstExpr {
+  var expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Literal;
+  expr.node.literal.kind = LiteralKind::Char;
+
+  val len: u32 = strlen(tok.lexeme);
+  if len == 2 && tok.lexeme[0] == '\\' {
+    var c: char;
+    if tok.lexeme[1] == 'n'  c = '\n';
+    else if tok.lexeme[1] == 't'  c = '\t';
+    else if tok.lexeme[1] == 'r'  c = '\r';
+    else if tok.lexeme[1] == '\\'  c = '\\';
+    else if tok.lexeme[1] == '\''  c = '\'';
+    else {
+     printf("Unknown escape sequence %s on line %u\n", tok.lexeme, tok.position);
+     abort();
+    }
+    expr.node.literal.value.ch = c;
+  } else if len == 1 {
+    expr.node.literal.value.ch = tok.lexeme[0];
+  } else {
+     printf("Unknown char literal %s on line %u\n", tok.lexeme, tok.position);
+     abort();
+  }
+
+  return expr;
+}
+
+fn parse_string_literal(ctx: *ParsingContext, tok: Token) -> *AstExpr {
+  var expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Literal;
+  expr.node.literal.kind = LiteralKind::Str;
+  expr.node.literal.value.str = tok.lexeme;
+  return expr;
+}
+
+fn parse_bool_literal(ctx: *ParsingContext, tok: Token) -> *AstExpr {
+  var expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Literal;
+  expr.node.literal.kind = LiteralKind::Bool;
+  expr.node.literal.value.boolean = tok.kind == TokenKind::True;
+  return expr;
+}
+
+fn parse_identifier(ctx: *ParsingContext, tok: Token) -> *AstExpr {
+  var expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Identifier;
+  expr.node.identifier = tok.lexeme;
+  return expr;
+}
+
+fn parse_call(ctx: *ParsingContext, left: *AstExpr) -> *AstExpr {
+
+  var result: *AstExpr = malloc(sizeof(AstExpr));
+  result.kind = AstExprKind::Call;
+  result.node.call.func = left;
+  result.node.call.args = malloc(8 * 16);
+  result.node.call.num_args = 0;
+
+  if !accept(ctx, TokenKind::RightParen) {
+    while true {
+      var expr: *AstExpr = parse_expression(ctx, 0);
+      result.node.call.args[result.node.call.num_args] = expr;
+      result.node.call.num_args = result.node.call.num_args + 1;
+      if !accept(ctx, TokenKind::Comma)  break;
+    }
+    expect(ctx, TokenKind::RightParen);
+  }
+
+  return result;
+
+}
+
+fn parse_prefix_operator(ctx: *ParsingContext, tok: Token) -> *AstExpr {
+  var expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Unary;
+
+  if tok.kind == TokenKind::Minus  expr.node.unary.operator = UnaryOperatorKind::Negation;
+  if tok.kind == TokenKind::Bang  expr.node.unary.operator = UnaryOperatorKind::Complement;
+  if tok.kind == TokenKind::And  expr.node.unary.operator = UnaryOperatorKind::Refer;
+  if tok.kind == TokenKind::Star  expr.node.unary.operator = UnaryOperatorKind::Deref;
+
+  expr.node.unary.inner = parse_expression(ctx, 11);
+
+  return expr;
+}
+
+fn parse_binary_operator(ctx: *ParsingContext, left: *AstExpr, operator: BinaryOperatorKind) -> *AstExpr {
+  val precedence: u32 = get_binary_operator_precedence(operator);
+  val right: *AstExpr = parse_expression(ctx, precedence);
+
+  var expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Binary;
+  expr.node.binary.operator = operator;
+  expr.node.binary.left = left;
+  expr.node.binary.right = right;
+
+  return expr;
+}
+
+fn parse_field_access(ctx: *ParsingContext, left: *AstExpr) -> *AstExpr {
+  val field_token: Token = consume(ctx);
+  if field_token.kind != TokenKind::Identifier {
+    printf("Token %d on line %d is not a valid field\n", field_token.kind, field_token.position);
+    abort();
+  }
+
+  var expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Field;
+  expr.node.field.field_name = field_token.lexeme;
+  expr.node.field.strct = left;
+
+  return expr;
+}
+
+fn parse_indexing(ctx: *ParsingContext, left: *AstExpr) -> *AstExpr {
+
+  val expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Indexing;
+  expr.node.index.index = parse_expression(ctx, 0);
+  expr.node.index.array = left;
+
+  expect(ctx, TokenKind::RightBracket);
+
+  return expr;
+}
+
+fn parse_infix_operator(ctx: *ParsingContext, left: *AstExpr, tok: Token) -> *AstExpr {
+
+  if tok.kind == TokenKind::LeftParen  return parse_call(ctx, left);
+  if tok.kind == TokenKind::Dot  return parse_field_access(ctx, left);
+  if tok.kind == TokenKind::LeftBracket  return parse_indexing(ctx, left);
+
+  val op: BinaryOperatorKind = convert_token_to_binary_operator(tok.kind);
+  if op != BinaryOperatorKind::Invalid {
+    return parse_binary_operator(ctx, left, op);
+  } else {
+    printf("Unsupported infix operator: %d on line %d\n", tok.kind, tok.position);
+    abort();
+  }
+}
+
+fn parse_block(ctx: *ParsingContext) -> *AstBlock
+
+fn parse_if(ctx: *ParsingContext) -> *AstExpr {
+
+  var expr: *AstExpr = malloc(sizeof(AstExpr));
+  expr.kind = AstExprKind::Conditional;
+  expr.node.conditional.condition = parse_expression(ctx, 0);
+  expr.node.conditional.then = parse_block(ctx);
+
+  if accept(ctx, TokenKind::Else) {
+    expr.node.conditional.otherwise = parse_block(ctx);
+  } else {
+    expr.node.conditional.otherwise = null;
+  }
+
+  return expr;
+}
+
+fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *AstExpr {
+  val tok: Token = consume(ctx);
+  val next: Token = look_ahead(ctx, 0);
+
+  var left : *AstExpr;
+
+  if tok.kind == TokenKind::Identifier {
+    if next.kind == TokenKind::ColonColon  {
+      left = malloc(sizeof(AstExpr));
+      left.kind = AstExprKind::Path;
+      left.node.path = parse_path(ctx, tok);
+    } else  left = parse_identifier(ctx, tok);
+  } else if tok.kind == TokenKind::Integer  left = parse_integer_literal(ctx, tok);
+  else if tok.kind == TokenKind::Char  left = parse_char_literal(ctx, tok);
+  else if tok.kind == TokenKind::String  left = parse_string_literal(ctx, tok);
+  else if tok.kind == TokenKind::Float  left = parse_float_literal(ctx, tok);
+  else if (tok.kind == TokenKind::False || tok.kind == TokenKind::True)  left = parse_bool_literal(ctx, tok);
+  else if (tok.kind == TokenKind::Minus || tok.kind == TokenKind::Bang ||
+           tok.kind == TokenKind::And || tok.kind == TokenKind::Star) left = parse_prefix_operator(ctx, tok);
+  else if tok.kind == TokenKind::If  left = parse_if(ctx);
+  else if tok.kind == TokenKind::LeftParen {
+    left = parse_expression(ctx, 0);
+    expect(ctx, TokenKind::RightParen);
+  } else {
+    printf("%d is not a valid expression prefix on line %d\n", tok.kind, tok.position);
+    abort();
+  }
+
+  while precedence < get_current_precedence(ctx) {
+    val next_tok : Token = consume(ctx);
+    left = parse_infix_operator(ctx, left, next_tok);
+  }
+
+  return left;
+}
+
+fn parse_stmt(ctx: *ParsingContext) -> *AstStmt
+
+fn parse_block(ctx: *ParsingContext) -> *AstBlock {
+
+  var block : *AstBlock = malloc(sizeof(AstBlock));
+  block.stmts = malloc(8 * 128);
+  block.num_stmts = 0;
+
+  val next : Token = look_ahead(ctx, 0);
+  if next.kind == TokenKind::LeftCurly {
+    expect(ctx, TokenKind::LeftCurly);
+    var i: u32 = 0;
+    while !accept(ctx, TokenKind::RightCurly) {
+      block.stmts[i] = parse_stmt(ctx);
+      block.num_stmts = block.num_stmts + 1;
+      i = i + 1;
+    }
+  } else {
+    block.stmts[0] = parse_stmt(ctx);
+    block.num_stmts = 1;
+  }
+
+  return block;
+}
+
+fn parse_item(ctx: *ParsingContext) -> *AstItem
+
+fn parse_stmt(ctx: *ParsingContext) -> *AstStmt {
+
+  var stmt: *AstStmt = malloc(sizeof(AstStmt));
+  val tok: Token = look_ahead(ctx, 0);
+  if accept(ctx, TokenKind::Break) {
+    stmt.kind = AstStmtKind::Break;
+  } else if accept(ctx, TokenKind::Continue) {
+    stmt.kind = AstStmtKind::Continue;
+  } else if accept(ctx, TokenKind::Return) {
+    stmt.kind = AstStmtKind::Return;
+    stmt.node._return = parse_expression(ctx, 0);
+  } else if accept(ctx, TokenKind::Defer) {
+    stmt.kind = AstStmtKind::Defer;
+    stmt.node._defer = parse_expression(ctx, 0);
+  } else if accept(ctx, TokenKind::While) {
+    stmt.kind = AstStmtKind::While;
+    stmt.node._while.condition = parse_expression(ctx, 0);
+    stmt.node._while.body = parse_block(ctx);
+  } else if accept(ctx, TokenKind::Semicolon) {
+    stmt.kind = AstStmtKind::Empty;
+  } else if (tok.kind == TokenKind::Var || tok.kind == TokenKind::Val) {
+    stmt.kind = AstStmtKind::Item;
+    stmt.node.item = parse_item(ctx);
+  } else {
+    val left: *AstExpr = parse_expression(ctx, 0);
+    val next: Token = look_ahead(ctx, 0);
+
+    if next.kind == TokenKind::Equal {
+      stmt.kind = AstStmtKind::Assignment;
+      stmt.node.assignment.left = left;
+      expect(ctx, TokenKind::Equal);
+      stmt.node.assignment.right = parse_expression(ctx, 0);
+    } else {
+      stmt.kind = AstStmtKind::Expr;
+      stmt.node.expr = left;
+    }
+  }
+
+  accept(ctx, TokenKind::Semicolon);
+
+  return stmt;
+}
+
+fn parse_variable_decl(ctx: *ParsingContext) -> *AstItem {
+
+  var item: *AstItem = malloc(sizeof(AstItem));
+ 
+  val keyword: Token = consume(ctx); 
+  if keyword.kind == TokenKind::Val  item.kind = AstItemKind::Const;
+  else if keyword.kind == TokenKind::Var  item.kind = AstItemKind::Variable;
+  else abort();
+ 
+  val identifier: Token = consume(ctx);
+  item.name = identifier.lexeme;
+  expect(ctx, TokenKind::Colon);
+  item.node.variable.type = parse_type(ctx);
+  
+  if accept(ctx, TokenKind::Equal)  item.node.variable.value = parse_expression(ctx, 0);
+  else  item.node.variable.value = null;
+
+  return item;
+}
+
+fn parse_compound_decl(ctx: *ParsingContext) -> *AstItem {
+  var item:* AstItem = malloc(sizeof(AstItem));
+  
+  if accept(ctx, TokenKind::Struct)  item.kind = AstItemKind::Struct;
+  else if accept(ctx, TokenKind::Union)  item.kind = AstItemKind::Union;
+  else abort();
+
+  val identifier: Token = consume(ctx);
+  item.name = identifier.lexeme;
+
+  expect(ctx, TokenKind::LeftCurly);
+
+  item.node.compound_type.field_names = malloc(8 * 16);
+  item.node.compound_type.field_types = malloc(8 * 16);
+  item.node.compound_type.num_fields = 0;
+
+  while !accept(ctx, TokenKind::RightCurly) {
+    val token: Token = consume(ctx);
+    if token.kind != TokenKind::Identifier {
+      printf("Expected field identifier on line %d but got %d\n", token.position, token.kind);
+      abort();
+    }
+    
+    item.node.compound_type.field_names[item.node.compound_type.num_fields] = token.lexeme;
+    expect(ctx, TokenKind::Colon);
+
+    val type: *AstType = parse_type(ctx);
+    item.node.compound_type.field_types[item.node.compound_type.num_fields] = type;
+    item.node.compound_type.num_fields = item.node.compound_type.num_fields + 1;
+    expect(ctx, TokenKind::Comma);
+  }
+
+  return item;
+}
+
+
+fn parse_enum_decl(ctx: *ParsingContext) -> *AstItem {
+  var item: * AstItem = malloc(sizeof(AstItem));
+  
+  expect(ctx, TokenKind::Enum);
+  item.kind = AstItemKind::Enum;
+
+  val identifier : Token = consume(ctx);
+  item.name = identifier.lexeme;
+
+  expect(ctx, TokenKind::LeftCurly);
+
+  item.node._enum.field_names = malloc(8 * 128);
+  item.node._enum.num_fields = 0;
+
+  while !accept(ctx, TokenKind::RightCurly) {
+    val token: Token = consume(ctx);
+    if token.kind != TokenKind::Identifier {
+      printf("Expected enum variant identifier on line %d but got %d\n", token.position, token.kind);
+      abort();
+    }
+    item.node._enum.field_names[item.node._enum.num_fields] = token.lexeme;
+    item.node._enum.num_fields = item.node._enum.num_fields + 1;
+    expect(ctx, TokenKind::Comma);
+  }
+
+  return item;
+}
+
+fn parse_signature(ctx: *ParsingContext) -> FunctionSignature {
+  var sig: FunctionSignature;
+
+  sig.parameter_names = malloc(8 * 16);
+  sig.parameter_types = malloc(8 * 16);
+  sig.num_parameters = 0;
+
+  expect(ctx, TokenKind::LeftParen);
+  
+  while !accept(ctx, TokenKind::RightParen) {
+
+    val name: Token = consume(ctx);
+    if name.kind != TokenKind::Identifier {
+      printf("Unexpected token %d in function signature on line %d\n", name.kind, name.position);
+      abort();
+    }
+    expect(ctx, TokenKind::Colon);
+
+    val type: *AstType = parse_type(ctx);
+    sig.parameter_names[sig.num_parameters] = name.lexeme;
+    sig.parameter_types[sig.num_parameters] = type;
+    sig.num_parameters = sig.num_parameters + 1;
+
+    accept(ctx, TokenKind::Comma);
+  }
+
+  if accept(ctx, TokenKind::Arrow)  sig.output_type = parse_type(ctx);
+  else {
+    //TODO Cleanup when proper field access has been implemented
+    var output_type: *AstType = malloc(sizeof(AstType));
+    output_type.kind = AstTypeKind::Unit;
+    sig.output_type = output_type;
+  }
+
+  return sig;
+}
+
+fn parse_function_decl(ctx: *ParsingContext) -> *AstItem {
+  val item: *AstItem = malloc(sizeof(AstItem));
+  expect(ctx, TokenKind::Fn);
+
+  val identifier : Token = consume(ctx);
+  item.name = identifier.lexeme;
+  item.kind = AstItemKind::Function;
+
+  item.node.function.signature = parse_signature(ctx);
+
+  if look_ahead(ctx, 0).kind == TokenKind::LeftCurly  item.node.function.block = parse_block(ctx);
+  else  item.node.function.block = null;
+
+  return item;
+}
+
+fn parse_item(ctx: *ParsingContext) -> *AstItem {
+  val tok : Token = look_ahead(ctx, 0);
+  
+  var item: *AstItem = malloc(sizeof(AstItem));
+
+  if tok.kind == TokenKind::Fn  item = parse_function_decl(ctx);
+  else if tok.kind == TokenKind::Struct || tok.kind == TokenKind::Union  item = parse_compound_decl(ctx);
+  else if tok.kind == TokenKind::Enum  item = parse_enum_decl(ctx);
+  else if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  item = parse_variable_decl(ctx);
+  else {
+    printf("Unexpected token %d on top-level on line %u\n", tok.kind, tok.position);
+    abort();
+  }
+
+  accept(ctx, TokenKind::Semicolon);
+
+  return item;
+}
+
+fn parse(tokens: *Token, num_tokens: u32, num_items: *u32) -> **AstItem {
+  var items: **AstItem = malloc(8 * 2048);
+  *num_items = 0;
+
+  val ctx: ParsingContext;
+  ctx.current_token = 0;
+  ctx.tokens = tokens;
+  ctx.num_tokens = num_tokens;
+
+  while !is_done_parsing(&ctx) {
+    items[*num_items] = parse_item(&ctx);
+    *num_items = *num_items + 1;
+  }
+
+  return items;
+}
+

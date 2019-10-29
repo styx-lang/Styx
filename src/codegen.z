@@ -1,0 +1,299 @@
+
+struct CodegenContext {
+  out: *FILE,
+  ident_is_ptr: *StrMap,
+}
+
+fn generate_expr(ctx: *CodegenContext, expr: *Expr)
+fn generate_block(ctx: *CodegenContext, block: *Block)
+fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt)
+fn generate_item(ctx: *CodegenContext, item: *Item)
+
+fn type_is_ptr(ty: *Type) -> bool {
+  return ty.kind == TypeKind::Ptr;
+}
+
+fn generate_prelude(ctx: *CodegenContext) {
+  fprintf(ctx.out,"//Prelude\n");
+  fprintf(ctx.out,"#include <stdint.h>\n");
+  fprintf(ctx.out,"#include <stdbool.h>\n");
+  fprintf(ctx.out,"#include <stdio.h>\n");
+  fprintf(ctx.out,"#include <stdlib.h>\n");
+  fprintf(ctx.out,"#include <string.h>\n");
+  fprintf(ctx.out,"typedef uint8_t u8;\n");
+  fprintf(ctx.out,"typedef uint16_t u16;\n");
+  fprintf(ctx.out,"typedef uint32_t u32;\n");
+  fprintf(ctx.out,"typedef uint64_t u64;\n");
+  fprintf(ctx.out,"typedef int8_t i8;\n");
+  fprintf(ctx.out,"typedef int16_t i16;\n");
+  fprintf(ctx.out,"typedef int32_t i32;\n");
+  fprintf(ctx.out,"typedef int64_t i64;\n");
+  fprintf(ctx.out,"typedef float f32;\n");
+  fprintf(ctx.out,"typedef double f64;\n");
+  fprintf(ctx.out,"#define null 0ul\n");
+}
+
+fn generate_type(ctx: *CodegenContext, ty: *Type) {
+  if ty.kind == TypeKind::Path  fprintf(ctx.out, "%s ", ty.node.path);
+  else if ty.kind == TypeKind::Ptr {
+    generate_type(ctx, ty.node.ptr);
+    fprintf(ctx.out, "* ");
+  }
+  else if ty.kind == TypeKind::Unit {
+    fprintf(ctx.out, "void ");
+  }
+  else abort();
+}
+
+fn generate_char(ctx: *CodegenContext, c: char) {
+  if c == '\n'  fprintf(ctx.out, "'\\n'");
+  else if c == '\t'  fprintf(ctx.out, "'\\t'");
+  else if c == '\r'  fprintf(ctx.out, "'\\r'");
+  else if c == '\\'  fprintf(ctx.out, "'\\\\'");
+  else if c == '\''  fprintf(ctx.out, "'\\''");
+  else fprintf(ctx.out, "'%c'", c);
+}
+
+fn generate_literal(ctx: *CodegenContext, lit: Literal) {
+  if lit.kind == LiteralKind::Int  fprintf(ctx.out, "%ld", lit.value.integer);
+  else if lit.kind == LiteralKind::Float  fprintf(ctx.out, "%f", lit.value.floating);
+  else if lit.kind == LiteralKind::Bool  if lit.value.boolean  fprintf(ctx.out, "true") else fprintf(ctx.out, "false");
+  else if lit.kind == LiteralKind::Str  fprintf(ctx.out, "\"%s\"", lit.value.str);
+  else if lit.kind == LiteralKind::Char  generate_char(ctx, lit.value.ch);
+  else abort();
+}
+
+fn generate_unary(ctx: *CodegenContext, unary: UnaryData) {
+  if unary.op == UnaryOperatorKind::Negation  fprintf(ctx.out, "-");
+  else if unary.op == UnaryOperatorKind::Complement  fprintf(ctx.out, "!");
+  else if unary.op == UnaryOperatorKind::Refer  fprintf(ctx.out, "&");
+  else if unary.op == UnaryOperatorKind::Deref  fprintf(ctx.out, "*");
+  else abort();
+  
+  generate_expr(ctx, unary.inner);
+}
+
+fn generate_binary(ctx: *CodegenContext, binary: BinaryData) {
+  fprintf(ctx.out, "(");
+  generate_expr(ctx, binary.left);
+  if binary.op == BinaryOperatorKind::Addition  fprintf(ctx.out, "+ ");
+  else if binary.op == BinaryOperatorKind::Subtraction  fprintf(ctx.out, "- ");
+  else if binary.op == BinaryOperatorKind::Product  fprintf(ctx.out, "* ");
+  else if binary.op == BinaryOperatorKind::Division  fprintf(ctx.out, "/ ");
+  else if binary.op == BinaryOperatorKind::Modulus  fprintf(ctx.out, "%% ");
+
+  else if binary.op == BinaryOperatorKind::Less  fprintf(ctx.out, "< ");
+  else if binary.op == BinaryOperatorKind::LessEq  fprintf(ctx.out, "<= ");
+  else if binary.op == BinaryOperatorKind::Greater  fprintf(ctx.out, "> ");
+  else if binary.op == BinaryOperatorKind::GreaterEq  fprintf(ctx.out, ">= ");
+  else if binary.op == BinaryOperatorKind::Equality  fprintf(ctx.out, "== ");
+  else if binary.op == BinaryOperatorKind::NotEq  fprintf(ctx.out, "!= ");
+
+  else if binary.op == BinaryOperatorKind::BAnd  fprintf(ctx.out, "& ");
+  else if binary.op == BinaryOperatorKind::BOr  fprintf(ctx.out, "| ");
+  else if binary.op == BinaryOperatorKind::Xor  fprintf(ctx.out, "^ ");
+  else if binary.op == BinaryOperatorKind::LeftShift  fprintf(ctx.out, "<< ");
+  else if binary.op == BinaryOperatorKind::RightShift  fprintf(ctx.out, ">> ");
+
+  else if binary.op == BinaryOperatorKind::And  fprintf(ctx.out, "&& ");
+  else if binary.op == BinaryOperatorKind::Or  fprintf(ctx.out, "|| ");
+  else abort();
+  generate_expr(ctx, binary.right);
+  fprintf(ctx.out, ")");
+}
+
+fn generate_call(ctx: *CodegenContext, call: CallData) {
+  generate_expr(ctx, call.func);
+
+  fprintf(ctx.out, "(");
+  var i: u32 = 0;
+  while i < call.num_args {
+    val arg: *Expr = call.args[i];
+    generate_expr(ctx, arg);
+    if i < call.num_args - 1  fprintf(ctx.out, ",");
+    i = i + 1;
+  }
+  fprintf(ctx.out, ") ");
+}
+
+fn generate_conditional(ctx: *CodegenContext, cond: ConditionalData) {
+  fprintf(ctx.out, "if (");
+  generate_expr(ctx, cond.condition);
+  fprintf(ctx.out, ")");
+  generate_block(ctx, cond.then);
+  if (cond.otherwise) {
+    fprintf(ctx.out, "else ");
+    generate_block(ctx, cond.otherwise);
+  }
+}
+
+fn generate_indexing(ctx: *CodegenContext, idx: IndexingData) {
+  generate_expr(ctx, idx.array);
+  fprintf(ctx.out, "[");
+  generate_expr(ctx, idx.index);
+  fprintf(ctx.out, "]");
+}
+
+fn generate_field(ctx: *CodegenContext, field: FieldData) {
+  var strct: *Expr = field.strct;
+  generate_expr(ctx, strct);
+  val is_ptr: bool = strmap_lookup(ctx.ident_is_ptr, strct.node.ident.name);
+  var accessor_str: *char;
+  if is_ptr  accessor_str = "->";
+  else  accessor_str = ".";
+  fprintf(ctx.out, "%s%s", accessor_str, field.ident.name);
+}
+
+fn generate_path(ctx: *CodegenContext, path: Path) {
+  fprintf(ctx.out, "_");
+  var i: u32 = 0;
+  while i < path.num_segments {
+    fprintf(ctx.out, "%s", path.segments[i]);
+    if i < path.num_segments - 1  fprintf(ctx.out, "_");
+    i = i + 1;
+  }
+}
+
+fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
+   if expr.kind == ExprKind::Unary  generate_unary(ctx, expr.node.unary);
+   else if expr.kind == ExprKind::Binary  generate_binary(ctx, expr.node.binary);
+   else if expr.kind == ExprKind::Block  generate_block(ctx, expr.node.block);
+   else if expr.kind == ExprKind::Call  generate_call(ctx, expr.node.call);
+   else if expr.kind == ExprKind::Conditional  generate_conditional(ctx, expr.node.conditional);
+   else if expr.kind == ExprKind::Indexing  generate_indexing(ctx, expr.node.indexing);
+   else if expr.kind == ExprKind::Field  generate_field(ctx, expr.node.field);
+   else if expr.kind == ExprKind::Literal  generate_literal(ctx, expr.node.lit);
+   else if expr.kind == ExprKind::Identifier  fprintf(ctx.out, "%s", expr.node.ident.name);
+   else if expr.kind == ExprKind::Path  generate_path(ctx, expr.node.path);
+   else abort();
+}
+
+fn generate_assignment(ctx: *CodegenContext, assignment: AssignmentData) {
+  generate_expr(ctx, assignment.left);
+  fprintf(ctx.out, " = ");
+  generate_expr(ctx, assignment.right);
+  fprintf(ctx.out, ";\n");
+}
+
+fn generate_return(ctx: *CodegenContext, expr: *Expr) {
+  fprintf(ctx.out, "return ");
+  generate_expr(ctx, expr);
+  fprintf(ctx.out, ";\n");
+}
+
+fn generate_while(ctx: *CodegenContext, data: *WhileData) {
+  fprintf(ctx.out, "while ( ");
+  generate_expr(ctx, data.condition);
+  fprintf(ctx.out, ")\n");
+  generate_block(ctx, data.body);
+}
+
+fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt) {
+  if stmt.kind == StmtKind::Assignment generate_assignment(ctx, stmt.node.assignment);
+  else if stmt.kind == StmtKind::Break  fprintf(ctx.out, "break;\n");
+  else if stmt.kind == StmtKind::Continue  fprintf(ctx.out, "continue;\n");
+  else if stmt.kind == StmtKind::Expr { generate_expr(ctx, stmt.node.expr); fprintf(ctx.out, ";\n"); }
+  else if stmt.kind == StmtKind::Item  generate_item(ctx, stmt.node.item);
+  else if stmt.kind == StmtKind::Return  generate_return(ctx, stmt.node._return);
+  else if stmt.kind == StmtKind::While  generate_while(ctx, &stmt.node._while);
+  else abort();
+}
+
+fn generate_block(ctx: *CodegenContext, block: *Block) {
+  fprintf(ctx.out, "{\n");
+  var i: u32 = 0;
+
+  while i < block.num_stmts {
+    generate_stmt(ctx, block.stmts[i]);
+    i = i + 1;
+  }
+  fprintf(ctx.out, "}\n");
+}
+
+fn generate_variable(ctx: *CodegenContext, item: *Item) {
+  generate_type(ctx, item.node.variable.ty);
+  strmap_insert(ctx.ident_is_ptr, item.ident.name, type_is_ptr(item.node.variable.ty));
+  fprintf(ctx.out, "%s ", item.ident.name);
+  if item.node.variable.body > 0 {
+    fprintf(ctx.out, "= ");
+    generate_expr(ctx, item.node.variable.body);
+  }
+  fprintf(ctx.out, ";\n");
+}
+
+fn generate_function(ctx: *CodegenContext, item: *Item) {
+  val data: FunctionData = item.node.function;
+  generate_type(ctx, data.output);
+
+  fprintf(ctx.out, " %s(", item.ident.name);
+
+  var i: u32 = 0;
+  while i < data.num_parameters {
+    generate_type(ctx, data.parameters[i].ty);
+  strmap_insert(ctx.ident_is_ptr, data.parameters[i].name.name, type_is_ptr(data.parameters[i].ty));
+    fprintf(ctx.out, " %s", data.parameters[i].name.name);
+    if i < data.num_parameters - 1  fprintf(ctx.out, ", ");
+    i = i + 1;
+  }
+  fprintf(ctx.out, ") ");
+  if data.body  generate_block(ctx, data.body);
+  else  fprintf(ctx.out, ";\n");
+}
+
+fn generate_enum(ctx: *CodegenContext, item: *Item) {
+  fprintf(ctx.out, "typedef enum %s {\n", item.ident.name);
+  var i: u32 = 0;
+
+  val data: EnumData = item.node._enum;
+
+  while i < data.num_variants {
+    fprintf(ctx.out, "_%s_%s,\n", item.ident.name, data.variants[i].ident.name);
+    i = i + 1;
+  }
+  fprintf(ctx.out, "} %s;\n\n", item.ident.name);
+}
+
+fn generate_compound(ctx: *CodegenContext, item: *Item) {
+
+  var compound_kind: *char;
+  if item.kind == ItemKind::Struct  compound_kind = "struct";
+  else  compound_kind = "union";
+
+  val data: CompoundData = item.node.compound;
+
+  fprintf(ctx.out, "typedef %s %s %s;\n", compound_kind, item.ident.name, item.ident.name);
+
+  if data.num_fields > 0 {
+    fprintf(ctx.out, "typedef %s %s {\n", compound_kind, item.ident.name);
+    var i: u32 = 0;
+    while i < data.num_fields {
+      generate_type(ctx, data.fields[i].ty);
+      fprintf(ctx.out, "%s;\n", data.fields[i].ident.name);
+      i = i + 1;
+    }
+    fprintf(ctx.out, "} %s;\n\n", item.ident.name);
+  }
+}
+
+fn generate_item(ctx: *CodegenContext, item: *Item) {
+  if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  generate_variable(ctx, item);
+  else if item.kind == ItemKind::Enum   generate_enum(ctx, item);
+  else if item.kind == ItemKind::Function   generate_function(ctx, item);
+  else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  generate_compound(ctx, item);
+  fprintf(ctx.out, "\n");
+}
+
+fn generate(items: **Item, num_items: u32, output_file: *char) {
+  var ctx: CodegenContext;
+
+  ctx.out = fopen(output_file, "w");
+  ctx.ident_is_ptr = strmap_create(1024);
+
+  generate_prelude(&ctx);
+
+  var i: u32 = 0;
+  while i < num_items {
+    generate_item(&ctx, items[i]);
+    i = i + 1;
+  }
+}

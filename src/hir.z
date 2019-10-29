@@ -1,0 +1,215 @@
+
+struct Type {}
+struct Expr {}
+struct Block {}
+
+struct HirId {
+  owner: u32,
+  local: u32,
+}
+
+struct Ident {
+  name: *char,
+}
+
+struct Path {
+  segments: **char,
+  num_segments: u32,
+}
+
+enum TypeKind {
+  Unit,
+  Ptr,
+  Path,
+}
+
+
+union TypeKindNode {
+  path: *char,
+  ptr: *Type,
+}
+
+struct Type {
+  id: HirId,
+  kind: TypeKind,
+  node: TypeKindNode,
+}
+
+enum VisibilityKind {
+  Public,
+  Private,
+}
+
+struct Visibility {
+  kind: VisibilityKind,
+}
+
+struct CompoundField {
+  ident: Ident,
+  id: HirId,
+  ty: *Type,
+}
+
+struct CompoundData {
+  fields: *CompoundField,
+  num_fields: u32,
+}
+
+struct EnumVariant {
+  ident: Ident,
+  id: HirId,
+}
+
+struct EnumData {
+  variants: *EnumVariant,
+  num_variants: u32,
+}
+
+struct FunctionParameter {
+  name: Ident,
+  ty: *Type,
+}
+
+struct FunctionData {
+  parameters: *FunctionParameter,
+  num_parameters: u32,
+  output: *Type,
+  body: *Block,
+}
+
+struct VariableData {
+  ty: *Type,
+  mutable: bool,
+  body: *Expr,
+}
+
+enum ItemKind {
+  Const,
+  Enum,
+  Function,
+  Struct,
+  Union,
+  Variable,
+}
+
+union ItemKindNode {
+  compound: CompoundData,
+  _enum: EnumData,
+  variable: VariableData,
+  function: FunctionData,
+}
+
+struct Item {
+  ident: Ident,
+  id: HirId,
+  kind: ItemKind,
+  node: ItemKindNode,
+  vis: Visibility,
+}
+
+struct BinaryData {
+  op: BinaryOperatorKind,
+  left: *Expr,
+  right: *Expr,
+}
+
+struct CallData {
+  func: *Expr,
+  args: **Expr,
+  num_args: u32,
+}
+
+struct ConditionalData {
+  condition: *Expr,
+  then: *Block,
+  otherwise: *Block,
+}
+
+struct IndexingData {
+  array: *Expr,
+  index: *Expr,
+}
+
+struct FieldData {
+  strct: *Expr,
+  ident: Ident,
+}
+
+struct UnaryData {
+  op: UnaryOperatorKind,
+  inner: *Expr,
+}
+
+enum ExprKind {
+  Binary,
+  Block,
+  Call,
+  Conditional,
+  Field,
+  Indexing,
+  Identifier,
+  Path,
+  Literal,
+  Unary,
+}
+
+union ExprKindNode {
+  binary: BinaryData,
+  block: *Block,
+  call: CallData,
+  conditional: ConditionalData,
+  field: FieldData,
+  indexing: IndexingData,
+  ident: Ident,
+  path: Path,
+  lit: Literal,
+  unary: UnaryData,
+}
+
+struct Expr {
+  id: HirId,
+  kind: ExprKind,
+  node: ExprKindNode,
+}
+
+struct AssignmentData {
+  left: *Expr,
+  right: *Expr,
+}
+
+struct WhileData {
+  condition: *Expr,
+  body: *Block,
+}
+
+enum StmtKind {
+  Assignment,
+  Item,
+  Expr,
+  Return,
+  Break,
+  Continue,
+  Defer,
+  While,
+  Empty,
+}
+
+union StmtKindNode {
+  assignment: AssignmentData,
+  item: *Item,
+  expr: *Expr,
+  _while: WhileData,
+  _return: *Expr,
+  _defer: *Expr,
+}
+
+struct Stmt {
+  kind: StmtKind,
+  node: StmtKindNode,
+}
+
+struct Block {
+  stmts: **Stmt,
+  num_stmts: u32,
+  id: HirId,
+}

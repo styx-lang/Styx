@@ -1,0 +1,242 @@
+
+struct LoweringContext {
+  padding: u32,
+}
+
+fn lower_expr(ctx: *LoweringContext, ast: *AstExpr) -> *Expr
+fn lower_block(ctx: *LoweringContext, ast: *AstBlock) -> *Block
+fn lower_item(ctx: *LoweringContext, ast: *AstItem) -> *Item
+
+fn create_id(ctx: *LoweringContext) -> HirId {
+  var id: HirId;
+  id.owner = 0;
+  id.local = 0;
+  return id;
+}
+
+fn lower_type(ctx: *LoweringContext, ast: *AstType) -> *Type {
+  var ty: *Type = malloc(sizeof(Type));
+  if ast.kind == AstTypeKind::Path {
+    ty.kind = TypeKind::Path;
+    ty.node.path = ast.node.path;
+  }
+  else if ast.kind == AstTypeKind::Ptr {
+    ty.kind = TypeKind::Ptr;
+    ty.node.ptr = lower_type(ctx, ast.node.ptr);
+  }
+  else if ast.kind == AstTypeKind::Unit {
+    ty.kind = TypeKind::Unit;
+  }
+  else abort();
+  return ty;
+}
+
+fn lower_unary(ctx: *LoweringContext, ast: *AstExpr, expr: *Expr) {
+  expr.kind = ExprKind::Unary;
+  expr.node.unary.op = ast.node.unary.operator;
+  expr.node.unary.inner = lower_expr(ctx, ast.node.unary.inner);
+}
+
+fn lower_binary(ctx: *LoweringContext, ast: *AstExpr, expr: *Expr) {
+  expr.kind = ExprKind::Binary;
+  expr.node.binary.op = ast.node.binary.operator;
+  expr.node.binary.left = lower_expr(ctx, ast.node.binary.left);
+  expr.node.binary.right = lower_expr(ctx, ast.node.binary.right);
+}
+
+fn lower_call(ctx: *LoweringContext, ast: *AstExpr, expr: *Expr) {
+  expr.kind = ExprKind::Call;
+  expr.node.call.func = lower_expr(ctx, ast.node.call.func);
+  expr.node.call.num_args = ast.node.call.num_args;
+  expr.node.call.args = malloc(8 * expr.node.call.num_args);
+  var i: u32 = 0;
+  while i < expr.node.call.num_args {
+    expr.node.call.args[i] = lower_expr(ctx, ast.node.call.args[i]);
+    i = i + 1;
+  }
+}
+
+fn lower_conditional(ctx: *LoweringContext, ast: *AstExpr, expr: *Expr) {
+  expr.kind = ExprKind::Conditional;
+  expr.node.conditional.condition = lower_expr(ctx, ast.node.conditional.condition);
+  expr.node.conditional.then = lower_block(ctx, ast.node.conditional.then);
+  if ast.node.conditional.otherwise expr.node.conditional.otherwise = lower_block(ctx, ast.node.conditional.otherwise);
+  else expr.node.conditional.otherwise = null;
+}
+
+fn lower_field(ctx: *LoweringContext, ast: *AstExpr, expr: *Expr) {
+  expr.kind = ExprKind::Field;
+  expr.node.field.strct = lower_expr(ctx, ast.node.field.strct);
+  expr.node.field.ident.name = ast.node.field.field_name;
+}
+
+fn lower_indexing(ctx: *LoweringContext, ast: *AstExpr, expr: *Expr) {
+  expr.kind = ExprKind::Indexing;
+  expr.node.indexing.array = lower_expr(ctx, ast.node.index.array);
+  expr.node.indexing.index = lower_expr(ctx, ast.node.index.index);
+}
+
+fn lower_ident(ctx: *LoweringContext, ast: *AstExpr, expr: *Expr) {
+  expr.kind = ExprKind::Identifier;
+  expr.node.ident.name = ast.node.identifier;
+}
+
+fn lower_path(ctx: *LoweringContext, ast: *AstExpr, expr: *Expr) {
+    var path: Path;
+    path.num_segments = ast.node.path.num_segments;
+    path.segments = malloc(8 * path.num_segments);
+    memcpy(path.segments, ast.node.path.segments, 8 * path.num_segments);
+
+    expr.kind = ExprKind::Path;
+    expr.node.path = path;
+}
+
+fn lower_lit(ctx: *LoweringContext, ast: *AstExpr, expr: *Expr) {
+  expr.kind = ExprKind::Literal;
+  expr.node.lit = ast.node.literal;
+}
+
+
+fn lower_expr(ctx: *LoweringContext, ast: *AstExpr) -> *Expr {
+  var expr: *Expr = malloc(sizeof(Expr));
+  expr.id = create_id(ctx);
+
+  if ast.kind == AstExprKind::Binary  lower_binary(ctx, ast, expr);
+  //else if ast.kind == AstExprKind::Block  lower_block(ctx, ast, expr);
+  else if ast.kind == AstExprKind::Call  lower_call(ctx, ast, expr);
+  else if ast.kind == AstExprKind::Conditional  lower_conditional(ctx, ast, expr);
+  else if ast.kind == AstExprKind::Field  lower_field(ctx, ast, expr);
+  else if ast.kind == AstExprKind::Indexing  lower_indexing(ctx, ast, expr);
+  else if ast.kind == AstExprKind::Identifier  lower_ident(ctx, ast, expr);
+  else if ast.kind == AstExprKind::Path  lower_path(ctx, ast, expr);
+  else if ast.kind == AstExprKind::Literal  lower_lit(ctx, ast, expr);
+  else if ast.kind == AstExprKind::Unary  lower_unary(ctx, ast, expr);
+  else abort();
+
+  return expr;
+}
+
+fn lower_stmt(ctx: *LoweringContext, ast: *AstStmt) -> *Stmt {
+  var stmt: *Stmt = malloc(sizeof(Stmt));
+  if ast.kind == AstStmtKind::Assignment {
+    stmt.kind = StmtKind::Assignment;
+    stmt.node.assignment.left = lower_expr(ctx, ast.node.assignment.left);
+    stmt.node.assignment.right = lower_expr(ctx, ast.node.assignment.right);
+  }
+  else if ast.kind == AstStmtKind::Item {
+    stmt.kind = StmtKind::Item;
+    stmt.node.item = lower_item(ctx, ast.node.item);
+  }
+  else if ast.kind == AstStmtKind::Expr {
+    stmt.kind = StmtKind::Expr;
+    stmt.node.expr = lower_expr(ctx, ast.node.expr);
+  }
+  else if ast.kind == AstStmtKind::Return {
+    stmt.kind = StmtKind::Return;
+    stmt.node._return = lower_expr(ctx, ast.node._return);
+  }
+  else if ast.kind == AstStmtKind::Break stmt.kind = StmtKind::Break;
+  else if ast.kind == AstStmtKind::Continue stmt.kind = StmtKind::Continue;
+  else if ast.kind == AstStmtKind::While {
+    stmt.kind = StmtKind::While;
+    stmt.node._while.condition = lower_expr(ctx, ast.node._while.condition);
+    stmt.node._while.body = lower_block(ctx, ast.node._while.body);
+  }
+  else abort();
+
+  return stmt;
+}
+
+fn lower_block(ctx: *LoweringContext, ast: *AstBlock) -> *Block {
+  var block: *Block = malloc(sizeof(Block));
+  block.id = create_id(ctx);
+  block.num_stmts = ast.num_stmts;
+  block.stmts = malloc(8 * block.num_stmts);
+
+  var i: u32 = 0;
+  while i < block.num_stmts {
+    block.stmts[i] = lower_stmt(ctx, ast.stmts[i]);
+    i = i + 1;
+  }
+  return block;
+}
+
+fn lower_variable(ctx: *LoweringContext, ast: *AstItem, item: *Item) {
+  if ast.kind == AstItemKind::Const item.kind = ItemKind::Const;
+  else item.kind = ItemKind::Variable;
+
+  item.node.variable.ty = lower_type(ctx, ast.node.variable.type);
+  if ast.node.variable.value item.node.variable.body = lower_expr(ctx, ast.node.variable.value);
+  else item.node.variable.body = null;
+}
+
+fn lower_function(ctx: *LoweringContext, ast: *AstItem, item: *Item) {
+  item.kind = ItemKind::Function;
+  item.node.function.output = lower_type(ctx, ast.node.function.signature.output_type);
+  item.node.function.num_parameters = ast.node.function.signature.num_parameters;
+  item.node.function.parameters = malloc(sizeof(FunctionParameter) * item.node.function.num_parameters);
+
+  var i: u32 = 0;
+  while i < item.node.function.num_parameters {
+    item.node.function.parameters[i].name.name = ast.node.function.signature.parameter_names[i];
+    item.node.function.parameters[i].ty = lower_type(ctx, ast.node.function.signature.parameter_types[i]);
+    i = i + 1;
+  }
+  if ast.node.function.block  item.node.function.body = lower_block(ctx, ast.node.function.block);
+  else  item.node.function.body = null;
+}
+
+fn lower_enum(ctx: *LoweringContext, ast: *AstItem, item: *Item) {
+  item.kind = ItemKind::Enum;
+  item.node._enum.num_variants = ast.node._enum.num_fields;
+  item.node._enum.variants = malloc(sizeof(EnumVariant) * item.node._enum.num_variants);
+
+  var i: u32 = 0;
+  while i < item.node._enum.num_variants {
+    item.node._enum.variants[i].ident.name = ast.node._enum.field_names[i];
+    i = i + 1;
+  }
+}
+
+fn lower_compound(ctx: *LoweringContext, ast: *AstItem, item: *Item) {
+  if ast.kind == AstItemKind::Union item.kind = ItemKind::Union
+  else item.kind = ItemKind::Struct;
+  item.node.compound.num_fields = ast.node.compound_type.num_fields;
+  item.node.compound.fields = malloc(sizeof(CompoundField) * item.node.compound.num_fields);
+  var i: u32 = 0;
+  while i < item.node.compound.num_fields {
+    item.node.compound.fields[i].ident.name = ast.node.compound_type.field_names[i];
+    item.node.compound.fields[i].ty = lower_type(ctx, ast.node.compound_type.field_types[i]);
+    i = i + 1;
+  }
+}
+
+
+fn lower_item(ctx: *LoweringContext, ast: *AstItem) -> *Item {
+  var item: *Item = malloc(sizeof(Item));
+  item.id = create_id(ctx);
+  item.ident.name = ast.name;
+  item.vis.kind = VisibilityKind::Private;
+
+  if ast.kind == AstItemKind::Const || ast.kind == AstItemKind::Variable  lower_variable(ctx, ast, item);
+  else if ast.kind == AstItemKind::Function  lower_function(ctx, ast, item);
+  else if ast.kind == AstItemKind::Enum  lower_enum(ctx, ast, item);
+  else if ast.kind == AstItemKind::Union || ast.kind == AstItemKind::Struct  lower_compound(ctx, ast, item);
+  return item;
+}
+
+fn lower(ast_items: **AstItem, num_ast_items: u32, num_hir_items: *u32) -> **Item {
+  var ctx: LoweringContext;
+
+  var items: **Item = malloc(8 * num_ast_items);
+
+  var i: u32 = 0;
+  while i < num_ast_items {
+    items[i] = lower_item(&ctx, ast_items[i]);
+    i = i + 1;
+  }
+
+  *num_hir_items = num_ast_items;
+
+  return items;
+}

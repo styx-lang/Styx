@@ -1,0 +1,249 @@
+struct LexingContext {
+  start: u64,
+  current: u64,
+  line: u64,
+  source: *char,
+  source_len: u64,
+  tokens: *Token,
+  current_token_idx: u64,
+}
+
+fn is_alphabetic(c: char) -> bool {
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+}
+
+fn is_digit(c: char) -> bool {
+  return c >= '0' && c <= '9'
+}
+
+fn is_alphanumeric(c: char) -> bool {
+  return is_alphabetic(c) || is_digit(c)
+}
+
+fn is_done_lexing(ctx: *LexingContext) -> bool {
+  return ctx.current >= ctx.source_len
+}
+
+fn peek_token(ctx: *LexingContext, offset: u64) -> char {
+  if is_done_lexing(ctx)  return 0
+  return ctx.source[ctx.current + offset]
+}
+
+fn advance(ctx: *LexingContext) -> char {
+  ctx.current = ctx.current + 1
+  return ctx.source[ctx.current - 1]
+}
+
+fn add_simple_token(ctx: *LexingContext, token_kind: TokenKind) {
+  var token: Token;
+  token.kind = token_kind;
+  token.lexeme = null;
+  token.position = ctx.line;
+  ctx.tokens[ctx.current_token_idx] = token;
+  ctx.current_token_idx = ctx.current_token_idx + 1;
+}
+
+fn add_lookahead_conditional_token(ctx: *LexingContext, expect: char, first: TokenKind, second: TokenKind) {
+  var token: Token;
+  token.lexeme = null;
+  token.position = ctx.line;
+  if peek_token(ctx,0) == expect {
+    advance(ctx);
+    token.kind = first;
+  } else {
+    token.kind = second;
+  }
+  ctx.tokens[ctx.current_token_idx] = token;
+  ctx.current_token_idx = ctx.current_token_idx + 1;
+}
+
+fn get_lexeme(ctx: *LexingContext, start_offset: u32, end_offset: u32) -> *char {
+  val str_len: u64 = ctx.current - (ctx.start + start_offset + end_offset);
+  var str: *char = malloc(str_len + 1);
+  memcpy(str, &ctx.source[ctx.start + start_offset], str_len);
+  str[str_len] = 0;
+  return str;
+}
+
+fn add_lexeme_token(ctx: *LexingContext, lexeme: *char, token_kind: TokenKind) {
+  var token: Token;
+  token.kind = token_kind;
+  token.lexeme = lexeme;
+  token.position = ctx.line;
+  ctx.tokens[ctx.current_token_idx] = token;
+  ctx.current_token_idx = ctx.current_token_idx + 1;
+}
+
+fn single_line_comment(ctx: *LexingContext) {
+  while (peek_token(ctx, 0) != '\n' && !is_done_lexing(ctx)) advance(ctx);
+}
+
+fn is_keyword(s: *char) -> TokenKind {
+  //TODO Replace this with a match
+
+  if !strcmp(s, "break")  return TokenKind::Break;
+  if !strcmp(s, "continue")  return TokenKind::Continue;
+  if !strcmp(s, "const")  return TokenKind::Continue;
+  if !strcmp(s, "defer")  return TokenKind::Defer;
+  if !strcmp(s, "enum")  return TokenKind::Enum;
+  if !strcmp(s, "else")  return TokenKind::Else;
+  if !strcmp(s, "false")  return TokenKind::False;
+  if !strcmp(s, "fn")  return TokenKind::Fn;
+  if !strcmp(s, "for")  return TokenKind::For;
+  if !strcmp(s, "if")  return TokenKind::If;
+  if !strcmp(s, "return")  return TokenKind::Return;
+  if !strcmp(s, "struct")  return TokenKind::Struct;
+  if !strcmp(s, "true")  return TokenKind::True;
+  if !strcmp(s, "union")  return TokenKind::Union;
+  if !strcmp(s, "var")  return TokenKind::Var;
+  if !strcmp(s, "val")  return TokenKind::Val;
+  if !strcmp(s, "while")  return TokenKind::While;
+  return TokenKind::Invalid;
+}
+
+fn lex_char(ctx: *LexingContext) {
+
+  val start_line: u64 = ctx.line;
+
+  while (peek_token(ctx, 0) != '\'' || (peek_token(ctx, -1) == '\\' && peek_token(ctx, -2) != '\\')) && !is_done_lexing(ctx) {
+    if peek_token(ctx, 0) == '\n'  ctx.line = ctx.line + 1;
+    advance(ctx);
+  }
+
+  if is_done_lexing(ctx) {
+    printf("Unterminated char starting on line %lu", start_line);
+    abort();
+  }
+
+  //Consume closing '
+  advance(ctx);
+
+  var lexeme: *char = get_lexeme(ctx, 1, 1);
+  add_lexeme_token(ctx, lexeme, TokenKind::Char);
+}
+
+fn lex_string(ctx: *LexingContext) {
+
+  val start_line: u64 = ctx.line;
+
+  while (peek_token(ctx, 0) != '"' || (peek_token(ctx, -1) == '\\' && peek_token(ctx, -2) != '\\')) && !is_done_lexing(ctx) {
+    if peek_token(ctx, 0) == '\n'  ctx.line = ctx.line + 1;
+    advance(ctx);
+  }
+
+  if is_done_lexing(ctx) {
+    printf("Unterminated string starting on line %lu", start_line);
+    abort();
+  }
+
+  //Consume closing "
+  advance(ctx);
+
+  var lexeme: *char = get_lexeme(ctx, 1, 1);
+  add_lexeme_token(ctx, lexeme, TokenKind::String);
+}
+
+fn lex_number(ctx: *LexingContext) {
+
+  while is_digit(peek_token(ctx,0))  advance(ctx);
+  var dot_encountered: bool = false;
+  if peek_token(ctx,0) == '.' && is_digit(peek_token(ctx,1)) {
+    dot_encountered = true;
+    advance(ctx);
+    while is_digit(peek_token(ctx,0))  advance(ctx);
+  }
+
+  val lexeme: *char = get_lexeme(ctx, 0, 0);
+  var t: TokenKind;
+  if dot_encountered  t = TokenKind::Float;
+  else  t = TokenKind::Integer;
+
+  add_lexeme_token(ctx, lexeme, t);
+}
+
+fn lex_identifier(ctx: *LexingContext) {
+  while (is_alphanumeric(peek_token(ctx, 0)) || peek_token(ctx, 0) == '_') advance(ctx);
+  val lexeme: *char = get_lexeme(ctx, 0, 0);
+  val keyword: TokenKind = is_keyword(lexeme);
+  if keyword != TokenKind::Invalid  add_simple_token(ctx, keyword);
+  else  add_lexeme_token(ctx, lexeme, TokenKind::Identifier);
+}
+
+fn scan_token(ctx: *LexingContext) {
+  val c: char = advance(ctx);
+
+  //TODO Implement char literals such that we can replace the raw ASCII values here
+  //TODO A match statement would also be quite nice here
+  if c == '(' add_simple_token(ctx, TokenKind::LeftParen);
+  else if c == ')' add_simple_token(ctx, TokenKind::RightParen);
+  else if c == '[' add_simple_token(ctx, TokenKind::LeftBracket);
+  else if c == ']' add_simple_token(ctx, TokenKind::RightBracket);
+  else if c == '{' add_simple_token(ctx, TokenKind::LeftCurly);
+  else if c == '}' add_simple_token(ctx, TokenKind::RightCurly);
+  else if c == '+' add_simple_token(ctx, TokenKind::Plus);
+  else if c == '*' add_simple_token(ctx, TokenKind::Star);
+  else if c == '%' add_simple_token(ctx, TokenKind::Percent);
+  else if c == '^' add_simple_token(ctx, TokenKind::Hat);
+  else if c == ';' add_simple_token(ctx, TokenKind::Semicolon);
+  else if c == '.' add_simple_token(ctx, TokenKind::Dot);
+  else if c == ',' add_simple_token(ctx, TokenKind::Comma);
+  else if c == '-' add_lookahead_conditional_token(ctx, '>', TokenKind::Arrow, TokenKind::Minus);
+  else if c == ':' add_lookahead_conditional_token(ctx, ':', TokenKind::ColonColon, TokenKind::Colon);
+  else if c == '=' add_lookahead_conditional_token(ctx, '=', TokenKind::EqualEqual, TokenKind::Equal);
+  else if c == '!' add_lookahead_conditional_token(ctx, '=', TokenKind::BangEqual, TokenKind::Bang);
+  else if c == '&' add_lookahead_conditional_token(ctx, '&', TokenKind::AndAnd, TokenKind::And);
+  else if c == '|' add_lookahead_conditional_token(ctx, '|', TokenKind::OrOr, TokenKind::Or);
+  else if c == '<' {
+     val n1: char = peek_token(ctx, 0);
+     if n1 == '<' {advance(ctx); add_simple_token(ctx, TokenKind::LessLess);}
+     else if n1 == '=' {advance(ctx); add_simple_token(ctx, TokenKind::LessEqual);}
+     else add_simple_token(ctx, TokenKind::Less);
+  }
+  else if c == '>' {
+     val n2: char = peek_token(ctx, 0);
+     if n2 == '>' {advance(ctx); add_simple_token(ctx, TokenKind::GreaterGreater);}
+     else if n2 == '=' {advance(ctx); add_simple_token(ctx, TokenKind::GreaterEqual);}
+     else add_simple_token(ctx, TokenKind::Greater);
+  }
+  else if c == '/' {
+    if peek_token(ctx, 0) == '/' single_line_comment(ctx);
+    else add_simple_token(ctx, TokenKind::Slash);
+  }
+  else if c == ' ' || c ==  '\t' || c == '\r' {}
+  else if c == '\n' ctx.line = ctx.line + 1;
+  else if c == '"' lex_string(ctx);
+  else if c == '\'' lex_char(ctx);
+  else {
+    if is_digit(c) lex_number(ctx);
+    else if (is_alphabetic(c) || c == '_') lex_identifier(ctx);
+    else {
+      printf("Unexpected character %c = %d on line %lu\n", c, c, ctx.line);
+      abort();
+    }
+  }
+}
+
+fn lex(source: *char, source_len: u64, tokens: **Token, num_tokens: *u32) {
+
+  var ctx: *LexingContext = malloc(sizeof(LexingContext));
+  ctx.source = source;
+  ctx.source_len = source_len;
+  ctx.start = 0;
+  ctx.current = 0;
+  ctx.line = 1;
+  ctx.tokens = malloc(sizeof(Token) * 5000);
+  ctx.current_token_idx = 0;
+
+  while !is_done_lexing(ctx) {
+    ctx.start = ctx.current;
+    scan_token(ctx);
+  }
+
+  if ctx.current_token_idx > 5000  {
+    printf("Lexer token overflow: %lu!\n", ctx.current_token_idx);
+    abort();
+  };
+
+  *tokens = ctx.tokens;
+  *num_tokens = ctx.current_token_idx;
+}

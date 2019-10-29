@@ -1,0 +1,23 @@
+enum IntegerSize {
+  I8,
+  I16,
+  I32,
+  I64,
+  Int_Arch,
+  Int_Unspecified,
+}
+
+enum FloatingSize {
+  F32,
+  F64,
+  Float_Unspecified,
+}
+
+enum PrimitiveTypeKind {
+  Void,
+  Signed,
+  Unsigned,
+  Floating,
+  Char,
+  Str,
+}

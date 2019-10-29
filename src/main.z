@@ -1,0 +1,37 @@
+
+
+fn load_file_content(path: *char, ptr: **char, length: *u64) {
+  var fp: *FILE = fopen(path, "rb");
+  fseek(fp, 0, SEEK_END);
+  *length = ftell(fp);
+  rewind(fp);
+  *ptr = malloc(*length);
+  fread(*ptr, 1, *length, fp);
+  fclose(fp);
+}
+
+
+fn main(argc: int, argv: **char) -> int {
+  if argc != 3 {
+    printf("Usage: compiler INPUT OUTPUT\n");
+    abort();
+  }
+
+  var content: *char;
+  var length: u64;
+  load_file_content(argv[1], &content, &length);
+
+  var tokens: *Token;
+  var num_tokens: u32;
+  lex(content, length, &tokens, &num_tokens);
+
+  var num_ast_items: u32;
+  val ast_items: **AstItem = parse(tokens, num_tokens, &num_ast_items);
+
+  var num_items: u32;
+  val items: **Item = lower(ast_items, num_ast_items, &num_items);
+
+  generate(items, num_items, argv[2]);
+
+  return 0;
+}

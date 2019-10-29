@@ -1,0 +1,250 @@
+//Forward declarations
+struct AstType {}
+struct AstExpr {}
+struct AstStmt {}
+struct AstItem {}
+struct AstBlock {}
+
+struct AstPath {
+  segments: **char,
+  num_segments: u32,
+}
+
+enum AstTypeKind {
+  Unit,
+  Ptr,
+  Path,
+}
+
+union AstTypeNode {
+  path: *char,
+  ptr: *AstType,
+}
+
+struct AstType {
+  kind: AstTypeKind,
+  node: AstTypeNode,
+}
+
+enum LiteralKind {
+  Int,
+  Float,
+  Bool,
+  Char,
+  Str,
+}
+
+union LiteralValue {
+  floating: f64,
+  integer: u64,
+  boolean: bool,
+  ch: char,
+  str: *char,
+}
+
+struct Literal {
+  kind: LiteralKind,
+  value: LiteralValue,
+}
+
+
+enum UnaryOperatorKind {
+  // "*" operator for dereferencing pointers
+  Deref,
+  // "&" operator for taking the address of a place
+  Refer,
+  // "-" operator for numerical negation
+  Negation,
+  // "!" for logical not
+  Complement,
+}
+
+enum BinaryOperatorKind {
+  Invalid, //Temporary until we get option types
+  //Aritmetic operators
+  Addition,
+  Subtraction,
+  Product,
+  Division,
+  Modulus,
+
+  //Comperative operators
+  Less,
+  LessEq,
+  Greater,
+  GreaterEq,
+  Equality,
+  NotEq,
+
+  //Bitwise operators
+  BAnd,
+  BOr,
+  Xor,
+  LeftShift,
+  RightShift,
+
+  //Logical operators
+  And,
+  Or,
+}
+
+struct BinaryAstExpr {
+  operator: BinaryOperatorKind,
+  left: *AstExpr,
+  right: *AstExpr,
+}
+
+struct CastAstExpr {
+  target_type: *AstType,
+  inner: *AstExpr,
+}
+
+struct CallAstExpr {
+  func: *AstExpr,
+  args: **AstExpr,
+  num_args: u32,
+}
+
+struct ConditionalAstExpr {
+  condition: *AstExpr,
+  then: *AstBlock,
+  otherwise: *AstBlock,
+}
+
+struct IndexingAstExpr {
+  array: *AstExpr,
+  index: *AstExpr,
+}
+
+struct FieldAstExpr {
+  strct: *AstExpr,
+  field_name: *char,
+}
+
+struct UnaryAstExpr {
+  operator: UnaryOperatorKind,
+  inner: *AstExpr,
+}
+
+union AstExprNode {
+  binary: BinaryAstExpr,
+  _cast: CastAstExpr,
+  call: CallAstExpr,
+  identifier: *char,
+  conditional: ConditionalAstExpr,
+  index: IndexingAstExpr,
+  literal: Literal,
+  field: FieldAstExpr,
+  unary: UnaryAstExpr,
+  path: AstPath,
+}
+
+enum AstExprKind {
+  Binary,
+  Cast,
+  Call,
+  Identifier,
+  Conditional,
+  Indexing,
+  Literal,
+  Field,
+  Unary,
+  Path,
+}
+
+struct AstExpr {
+  kind: AstExprKind,
+  node: AstExprNode,
+}
+
+
+struct AssignmentAstStmt {
+  left: *AstExpr,
+  right: *AstExpr,
+}
+
+struct WhileAstStmt {
+  condition: *AstExpr,
+  body: *AstBlock,
+}
+
+enum AstStmtKind {
+  Assignment,
+  Item,
+  Expr,
+  Return,
+  Break,
+  Continue,
+  Defer,
+  While,
+  Empty,
+}
+
+union AstStmtNode {
+  assignment: AssignmentAstStmt,
+  item: *AstItem,
+  expr: *AstExpr,
+  _return: *AstExpr,
+  _defer: *AstExpr,
+  _while: WhileAstStmt,
+}
+
+struct AstStmt {
+  kind: AstStmtKind,
+  node: AstStmtNode,
+}
+
+struct AstBlock {
+  stmts: **AstStmt,
+  num_stmts: u32,
+}
+
+struct CompoundTypeDecl {
+  field_names: **char,
+  field_types: **AstType,
+  num_fields: u32,
+}
+
+struct EnumDecl {
+  field_names: **char,
+  num_fields: u32,
+}
+
+struct FunctionSignature {
+  parameter_types: **AstType,
+  parameter_names: **char,
+  num_parameters: u32,
+  output_type: *AstType,
+}
+
+struct FunctionDecl {
+  signature: FunctionSignature,
+  block: *AstBlock,
+}
+
+struct VariableDecl {
+  type: *AstType,
+  value: *AstExpr,
+}
+
+enum AstItemKind {
+  Const,
+  Enum,
+  Function,
+  Struct,
+  Union,
+  Variable,
+}
+
+union AstItemNode {
+  function: FunctionDecl,
+  variable: VariableDecl,
+  compound_type: CompoundTypeDecl,
+  _enum: EnumDecl,
+}
+
+struct AstItem {
+  name: *char,
+  kind: AstItemKind,
+  node: AstItemNode,
+}
