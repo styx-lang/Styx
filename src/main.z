@@ -1,12 +1,12 @@
 
 
-fn load_file_content(path: *char, ptr: **char, length: *u32) {
-  var fp: *FILE = fopen(path, "rb");
+fn load_file_content(file: *SourceFile) {
+  var fp: *FILE = fopen(file.name, "rb");
   fseek(fp, 0, SEEK_END);
-  *length = ftell(fp);
+  file.length = ftell(fp);
   rewind(fp);
-  *ptr = malloc(*length);
-  fread(*ptr, 1, *length, fp);
+  file.content = malloc(file.length);
+  fread(file.content, 1, file.length, fp);
   fclose(fp);
 }
 
@@ -17,23 +17,19 @@ fn main(argc: int, argv: **char) -> int {
     abort();
   }
 
-  var source_map: SourceMap;
-  source_map.files = calloc(8 * 1, 1);
-  source_map.num_files = 1;
-  source_map.file_starts = calloc(sizeof(u32) * 1, 1);
+  var sess: Session;
 
-  var source_file: *SourceFile = &source_map.files[0];
-  source_file.name = argv[1];
-  load_file_content(argv[1], &source_file.content, &source_file.length);
-  source_file.lines = calloc(sizeof(u32) * 4096, 1);
-  source_file.num_lines = 1;
+  sess.source = source_map_create();
+
+  var source_file: *SourceFile = source_map_new_file(&sess.source, argv[1]);
+  load_file_content(source_file);
 
   var tokens: *Token;
   var num_tokens: u32;
   lex(source_file, &tokens, &num_tokens);
 
   var num_ast_items: u32;
-  val ast_items: **AstItem = parse(tokens, num_tokens, &source_map, &num_ast_items);
+  val ast_items: **AstItem = parse(&sess, tokens, num_tokens, &num_ast_items);
 
   var num_items: u32;
   val items: **Item = lower(ast_items, num_ast_items, &num_items);

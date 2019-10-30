@@ -1,5 +1,6 @@
 #include "strmap.c"
 #include "error.c"
+#include "session.c"
 #include "tokens.c"
 #include "lexer.c"
 #include "ast.c"

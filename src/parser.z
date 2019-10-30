@@ -554,7 +554,7 @@ fn parse_item(ctx: *ParsingContext) -> *AstItem {
   return item;
 }
 
-fn parse(tokens: *Token, num_tokens: u32, source_map: *SourceMap, num_items: *u32) -> **AstItem {
+fn parse(sess: *Session, tokens: *Token, num_tokens: u32, num_items: *u32) -> **AstItem {
   var items: **AstItem = malloc(8 * 2048);
   *num_items = 0;
 
@@ -562,7 +562,7 @@ fn parse(tokens: *Token, num_tokens: u32, source_map: *SourceMap, num_items: *u3
   ctx.current_token = 0;
   ctx.tokens = tokens;
   ctx.num_tokens = num_tokens;
-  ctx.source_map = source_map;
+  ctx.source_map = &sess.source;
 
   while !is_done_parsing(&ctx) {
     items[*num_items] = parse_item(&ctx);
