@@ -68,6 +68,6 @@ enum TokenKind {
 
 struct Token {
   kind: TokenKind,
-  position: u32,
+  span: Span,
   lexeme: *char,
 }

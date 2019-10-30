@@ -1,6 +1,6 @@
 
 
-fn load_file_content(path: *char, ptr: **char, length: *u64) {
+fn load_file_content(path: *char, ptr: **char, length: *u32) {
   var fp: *FILE = fopen(path, "rb");
   fseek(fp, 0, SEEK_END);
   *length = ftell(fp);
@@ -17,16 +17,23 @@ fn main(argc: int, argv: **char) -> int {
     abort();
   }
 
-  var content: *char;
-  var length: u64;
-  load_file_content(argv[1], &content, &length);
+  var source_map: SourceMap;
+  source_map.files = calloc(8 * 1, 1);
+  source_map.num_files = 1;
+  source_map.file_starts = calloc(sizeof(u32) * 1, 1);
+
+  var source_file: *SourceFile = &source_map.files[0];
+  source_file.name = argv[1];
+  load_file_content(argv[1], &source_file.content, &source_file.length);
+  source_file.lines = calloc(sizeof(u32) * 4096, 1);
+  source_file.num_lines = 1;
 
   var tokens: *Token;
   var num_tokens: u32;
-  lex(content, length, &tokens, &num_tokens);
+  lex(source_file, &tokens, &num_tokens);
 
   var num_ast_items: u32;
-  val ast_items: **AstItem = parse(tokens, num_tokens, &num_ast_items);
+  val ast_items: **AstItem = parse(tokens, num_tokens, &source_map, &num_ast_items);
 
   var num_items: u32;
   val items: **Item = lower(ast_items, num_ast_items, &num_items);

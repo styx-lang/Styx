@@ -2,6 +2,7 @@ struct ParsingContext {
   current_token: u64,
   tokens: *Token,
   num_tokens: u64,
+  source_map: *SourceMap,
 }
 
 fn is_done_parsing(ctx: *ParsingContext) -> bool {
@@ -22,8 +23,8 @@ fn expect(ctx: *ParsingContext, token: TokenKind) -> bool {
     return true;
   } else {
     val tok: Token = ctx.tokens[ctx.current_token];
-    printf("Expected %d but got %d on line %d\n", token, tok.kind, tok.position);
-    abort();
+    emit_error(ctx.source_map, tok.span, "Expect failed!");
+    return false;
   }
 }
 
@@ -46,10 +47,7 @@ fn parse_path(ctx: *ParsingContext, tok: Token) -> AstPath {
   path.num_segments = 0;
 
   while true {
-    if tok.kind != TokenKind::Identifier {
-      printf("Expected identifier in path but got %u on line %u\n", tok.kind, tok.position);
-      abort();
-    }
+    if tok.kind != TokenKind::Identifier emit_error(ctx.source_map, tok.span, "Expected identifier in path");
     path.num_segments = path.num_segments + 1;
     path.segments[path.num_segments - 1] = tok.lexeme;
     if !accept(ctx, TokenKind::ColonColon)  break;
@@ -69,11 +67,9 @@ fn parse_type(ctx: *ParsingContext) -> *AstType {
   } else if token.kind == TokenKind::Star {
     kind = AstTypeKind::Ptr;
     node.ptr = parse_type(ctx);
-  } else {
-    printf("Expected type but got %d on line %d", token.kind, token.position);
-    abort();
   }
-  
+  else  emit_error(ctx.source_map, token.span, "Expected type");
+
   var type: *AstType = malloc(sizeof(AstType));
   type.kind = kind;
   type.node = node;
@@ -170,17 +166,12 @@ fn parse_char_literal(ctx: *ParsingContext, tok: Token) -> *AstExpr {
     else if tok.lexeme[1] == 'r'  c = '\r';
     else if tok.lexeme[1] == '\\'  c = '\\';
     else if tok.lexeme[1] == '\''  c = '\'';
-    else {
-     printf("Unknown escape sequence %s on line %u\n", tok.lexeme, tok.position);
-     abort();
-    }
+    else  emit_error(ctx.source_map, tok.span, "Unknown escape sequence");
     expr.node.literal.value.ch = c;
   } else if len == 1 {
     expr.node.literal.value.ch = tok.lexeme[0];
-  } else {
-     printf("Unknown char literal %s on line %u\n", tok.lexeme, tok.position);
-     abort();
   }
+  else  emit_error(ctx.source_map, tok.span, "Invalid char literal");
 
   return expr;
 }
@@ -260,8 +251,7 @@ fn parse_binary_operator(ctx: *ParsingContext, left: *AstExpr, operator: BinaryO
 fn parse_field_access(ctx: *ParsingContext, left: *AstExpr) -> *AstExpr {
   val field_token: Token = consume(ctx);
   if field_token.kind != TokenKind::Identifier {
-    printf("Token %d on line %d is not a valid field\n", field_token.kind, field_token.position);
-    abort();
+    emit_error(ctx.source_map, field_token.span, "Invalid field access");
   }
 
   var expr: *AstExpr = malloc(sizeof(AstExpr));
@@ -293,10 +283,9 @@ fn parse_infix_operator(ctx: *ParsingContext, left: *AstExpr, tok: Token) -> *As
   val op: BinaryOperatorKind = convert_token_to_binary_operator(tok.kind);
   if op != BinaryOperatorKind::Invalid {
     return parse_binary_operator(ctx, left, op);
-  } else {
-    printf("Unsupported infix operator: %d on line %d\n", tok.kind, tok.position);
-    abort();
   }
+  else  emit_error(ctx.source_map, tok.span, "Unsupported infix operator");
+  return null;
 }
 
 fn parse_block(ctx: *ParsingContext) -> *AstBlock
@@ -340,10 +329,8 @@ fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *AstExpr {
   else if tok.kind == TokenKind::LeftParen {
     left = parse_expression(ctx, 0);
     expect(ctx, TokenKind::RightParen);
-  } else {
-    printf("%d is not a valid expression prefix on line %d\n", tok.kind, tok.position);
-    abort();
   }
+  else  emit_error(ctx.source_map, tok.span, "Invalid expression prefix");
 
   while precedence < get_current_precedence(ctx) {
     val next_tok : Token = consume(ctx);
@@ -426,17 +413,17 @@ fn parse_stmt(ctx: *ParsingContext) -> *AstStmt {
 fn parse_variable_decl(ctx: *ParsingContext) -> *AstItem {
 
   var item: *AstItem = malloc(sizeof(AstItem));
- 
-  val keyword: Token = consume(ctx); 
+
+  val keyword: Token = consume(ctx);
   if keyword.kind == TokenKind::Val  item.kind = AstItemKind::Const;
   else if keyword.kind == TokenKind::Var  item.kind = AstItemKind::Variable;
   else abort();
- 
+
   val identifier: Token = consume(ctx);
   item.name = identifier.lexeme;
   expect(ctx, TokenKind::Colon);
   item.node.variable.type = parse_type(ctx);
-  
+
   if accept(ctx, TokenKind::Equal)  item.node.variable.value = parse_expression(ctx, 0);
   else  item.node.variable.value = null;
 
@@ -445,7 +432,7 @@ fn parse_variable_decl(ctx: *ParsingContext) -> *AstItem {
 
 fn parse_compound_decl(ctx: *ParsingContext) -> *AstItem {
   var item:* AstItem = malloc(sizeof(AstItem));
-  
+
   if accept(ctx, TokenKind::Struct)  item.kind = AstItemKind::Struct;
   else if accept(ctx, TokenKind::Union)  item.kind = AstItemKind::Union;
   else abort();
@@ -461,11 +448,8 @@ fn parse_compound_decl(ctx: *ParsingContext) -> *AstItem {
 
   while !accept(ctx, TokenKind::RightCurly) {
     val token: Token = consume(ctx);
-    if token.kind != TokenKind::Identifier {
-      printf("Expected field identifier on line %d but got %d\n", token.position, token.kind);
-      abort();
-    }
-    
+    if token.kind != TokenKind::Identifier  emit_error(ctx.source_map, token.span, "Expected field identifier");
+
     item.node.compound_type.field_names[item.node.compound_type.num_fields] = token.lexeme;
     expect(ctx, TokenKind::Colon);
 
@@ -481,7 +465,7 @@ fn parse_compound_decl(ctx: *ParsingContext) -> *AstItem {
 
 fn parse_enum_decl(ctx: *ParsingContext) -> *AstItem {
   var item: * AstItem = malloc(sizeof(AstItem));
-  
+
   expect(ctx, TokenKind::Enum);
   item.kind = AstItemKind::Enum;
 
@@ -495,10 +479,7 @@ fn parse_enum_decl(ctx: *ParsingContext) -> *AstItem {
 
   while !accept(ctx, TokenKind::RightCurly) {
     val token: Token = consume(ctx);
-    if token.kind != TokenKind::Identifier {
-      printf("Expected enum variant identifier on line %d but got %d\n", token.position, token.kind);
-      abort();
-    }
+    if token.kind != TokenKind::Identifier  emit_error(ctx.source_map, token.span, "Expected enum variant identifier");
     item.node._enum.field_names[item.node._enum.num_fields] = token.lexeme;
     item.node._enum.num_fields = item.node._enum.num_fields + 1;
     expect(ctx, TokenKind::Comma);
@@ -515,14 +496,11 @@ fn parse_signature(ctx: *ParsingContext) -> FunctionSignature {
   sig.num_parameters = 0;
 
   expect(ctx, TokenKind::LeftParen);
-  
+
   while !accept(ctx, TokenKind::RightParen) {
 
     val name: Token = consume(ctx);
-    if name.kind != TokenKind::Identifier {
-      printf("Unexpected token %d in function signature on line %d\n", name.kind, name.position);
-      abort();
-    }
+    if name.kind != TokenKind::Identifier  emit_error(ctx.source_map, name.span, "Unexpected token in function signature");
     expect(ctx, TokenKind::Colon);
 
     val type: *AstType = parse_type(ctx);
@@ -562,24 +540,21 @@ fn parse_function_decl(ctx: *ParsingContext) -> *AstItem {
 
 fn parse_item(ctx: *ParsingContext) -> *AstItem {
   val tok : Token = look_ahead(ctx, 0);
-  
+
   var item: *AstItem = malloc(sizeof(AstItem));
 
   if tok.kind == TokenKind::Fn  item = parse_function_decl(ctx);
   else if tok.kind == TokenKind::Struct || tok.kind == TokenKind::Union  item = parse_compound_decl(ctx);
   else if tok.kind == TokenKind::Enum  item = parse_enum_decl(ctx);
   else if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  item = parse_variable_decl(ctx);
-  else {
-    printf("Unexpected token %d on top-level on line %u\n", tok.kind, tok.position);
-    abort();
-  }
+  else  emit_error(ctx.source_map, tok.span, "Unexpected token on top-level");
 
   accept(ctx, TokenKind::Semicolon);
 
   return item;
 }
 
-fn parse(tokens: *Token, num_tokens: u32, num_items: *u32) -> **AstItem {
+fn parse(tokens: *Token, num_tokens: u32, source_map: *SourceMap, num_items: *u32) -> **AstItem {
   var items: **AstItem = malloc(8 * 2048);
   *num_items = 0;
 
@@ -587,6 +562,7 @@ fn parse(tokens: *Token, num_tokens: u32, num_items: *u32) -> **AstItem {
   ctx.current_token = 0;
   ctx.tokens = tokens;
   ctx.num_tokens = num_tokens;
+  ctx.source_map = source_map;
 
   while !is_done_parsing(&ctx) {
     items[*num_items] = parse_item(&ctx);
@@ -595,4 +571,3 @@ fn parse(tokens: *Token, num_tokens: u32, num_items: *u32) -> **AstItem {
 
   return items;
 }
-
