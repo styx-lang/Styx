@@ -19,6 +19,7 @@ fn main(argc: int, argv: **char) -> int {
 
   var sess: Session;
 
+  sess.interner = interner_create();
   sess.source = source_map_create();
 
   var source_file: *SourceFile = source_map_new_file(&sess.source, argv[1]);

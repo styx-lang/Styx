@@ -1,5 +1,6 @@
 
 
 struct Session {
+  interner: Interner,
   source: SourceMap,
 }
