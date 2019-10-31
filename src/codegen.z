@@ -2,6 +2,7 @@
 struct CodegenContext {
   out: *FILE,
   ident_is_ptr: *StrMap,
+  sess: *Session,
 }
 
 fn generate_expr(ctx: *CodegenContext, expr: *Expr)
@@ -33,8 +34,17 @@ fn generate_prelude(ctx: *CodegenContext) {
   fprintf(ctx.out,"#define null 0ul\n");
 }
 
+fn generate_sid(ctx: *CodegenContext, sid: Sid) {
+  var sess: *Session = ctx.sess;
+  fprintf(ctx.out, "%s",  get_str(&sess.interner, sid));
+}
+
+fn generate_identifier(ctx: *CodegenContext, ident: Ident) {
+  generate_sid(ctx, ident.name);
+}
+
 fn generate_type(ctx: *CodegenContext, ty: *Type) {
-  if ty.kind == TypeKind::Path  fprintf(ctx.out, "%s ", ty.node.path);
+  if ty.kind == TypeKind::Path  generate_sid(ctx, ty.node.path);
   else if ty.kind == TypeKind::Ptr {
     generate_type(ctx, ty.node.ptr);
     fprintf(ctx.out, "* ");
@@ -58,7 +68,10 @@ fn generate_literal(ctx: *CodegenContext, lit: Literal) {
   if lit.kind == LiteralKind::Int  fprintf(ctx.out, "%ld", lit.value.integer);
   else if lit.kind == LiteralKind::Float  fprintf(ctx.out, "%f", lit.value.floating);
   else if lit.kind == LiteralKind::Bool  if lit.value.boolean  fprintf(ctx.out, "true") else fprintf(ctx.out, "false");
-  else if lit.kind == LiteralKind::Str  fprintf(ctx.out, "\"%s\"", lit.value.str);
+  else if lit.kind == LiteralKind::Str  {
+    var sess: *Session = ctx.sess;
+    fprintf(ctx.out, "\"%s\"",  get_str(&sess.interner, lit.value.str));
+  }
   else if lit.kind == LiteralKind::Char  generate_char(ctx, lit.value.ch);
   else abort();
 }
@@ -137,18 +150,27 @@ fn generate_indexing(ctx: *CodegenContext, idx: IndexingData) {
 fn generate_field(ctx: *CodegenContext, field: FieldData) {
   var strct: *Expr = field.strct;
   generate_expr(ctx, strct);
-  val is_ptr: bool = strmap_lookup(ctx.ident_is_ptr, strct.node.ident.name);
+
+  var sess: *Session = ctx.sess;
+  var field_name: *char = get_str(&sess.interner, field.ident.name)
+
+  var is_ptr: bool = false;
   var accessor_str: *char;
+  if strct.kind == ExprKind::Identifier {
+    var strct_name: *char = get_str(&sess.interner, strct.node.ident.name)
+    is_ptr = strmap_lookup(ctx.ident_is_ptr, strct_name);
+  }
+
   if is_ptr  accessor_str = "->";
   else  accessor_str = ".";
-  fprintf(ctx.out, "%s%s", accessor_str, field.ident.name);
+  fprintf(ctx.out, "%s%s", accessor_str, field_name);
 }
 
 fn generate_path(ctx: *CodegenContext, path: Path) {
   fprintf(ctx.out, "_");
   var i: u32 = 0;
   while i < path.num_segments {
-    fprintf(ctx.out, "%s", path.segments[i]);
+    generate_identifier(ctx, path.segments[i]);
     if i < path.num_segments - 1  fprintf(ctx.out, "_");
     i = i + 1;
   }
@@ -163,7 +185,7 @@ fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
    else if expr.kind == ExprKind::Indexing  generate_indexing(ctx, expr.node.indexing);
    else if expr.kind == ExprKind::Field  generate_field(ctx, expr.node.field);
    else if expr.kind == ExprKind::Literal  generate_literal(ctx, expr.node.lit);
-   else if expr.kind == ExprKind::Identifier  fprintf(ctx.out, "%s", expr.node.ident.name);
+   else if expr.kind == ExprKind::Identifier  generate_identifier(ctx, expr.node.ident);
    else if expr.kind == ExprKind::Path  generate_path(ctx, expr.node.path);
    else abort();
 }
@@ -212,8 +234,12 @@ fn generate_block(ctx: *CodegenContext, block: *Block) {
 
 fn generate_variable(ctx: *CodegenContext, item: *Item) {
   generate_type(ctx, item.node.variable.ty);
-  strmap_insert(ctx.ident_is_ptr, item.ident.name, type_is_ptr(item.node.variable.ty));
-  fprintf(ctx.out, "%s ", item.ident.name);
+
+  var sess: *Session = ctx.sess;
+  var var_name: *char = get_str(&sess.interner, item.ident.name);
+
+  strmap_insert(ctx.ident_is_ptr, var_name, type_is_ptr(item.node.variable.ty));
+  fprintf(ctx.out, " %s ", var_name);
   if item.node.variable.body > 0 {
     fprintf(ctx.out, "= ");
     generate_expr(ctx, item.node.variable.body);
@@ -226,13 +252,18 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
   val header: FunctionHeader = func.header;
   generate_type(ctx, header.output);
 
-  fprintf(ctx.out, " %s(", item.ident.name);
+  var sess: *Session = ctx.sess;
+  var func_name: *char = get_str(&sess.interner, item.ident.name);
+
+  fprintf(ctx.out, " %s(", func_name);
 
   var i: u32 = 0;
   while i < header.num_parameters {
     generate_type(ctx, header.parameters[i].ty);
-  strmap_insert(ctx.ident_is_ptr, header.parameters[i].ident.name, type_is_ptr(header.parameters[i].ty));
-    fprintf(ctx.out, " %s", header.parameters[i].ident.name);
+
+    var param_name: *char = get_str(&sess.interner, header.parameters[i].ident.name);
+    strmap_insert(ctx.ident_is_ptr, param_name, type_is_ptr(header.parameters[i].ty));
+    fprintf(ctx.out, " %s", param_name);
     if i < header.num_parameters - 1  fprintf(ctx.out, ", ");
     i = i + 1;
   }
@@ -242,19 +273,27 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 }
 
 fn generate_enum(ctx: *CodegenContext, item: *Item) {
-  fprintf(ctx.out, "typedef enum %s {\n", item.ident.name);
+
+  var sess: *Session = ctx.sess;
+  var enum_name: *char = get_str(&sess.interner, item.ident.name);
+
+  fprintf(ctx.out, "typedef enum %s {\n", enum_name);
   var i: u32 = 0;
 
   val data: EnumData = item.node._enum;
 
   while i < data.num_variants {
-    fprintf(ctx.out, "_%s_%s,\n", item.ident.name, data.variants[i].ident.name);
+    var variant_name: *char = get_str(&sess.interner, data.variants[i].ident.name);
+    fprintf(ctx.out, "_%s_%s,\n", enum_name, variant_name);
     i = i + 1;
   }
-  fprintf(ctx.out, "} %s;\n\n", item.ident.name);
+  fprintf(ctx.out, "} %s;\n\n", enum_name);
 }
 
 fn generate_compound(ctx: *CodegenContext, item: *Item) {
+
+  var sess: *Session = ctx.sess;
+  var compound_name: *char = get_str(&sess.interner, item.ident.name);
 
   var compound_kind: *char;
   if item.kind == ItemKind::Struct  compound_kind = "struct";
@@ -262,17 +301,19 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
 
   val data: CompoundData = item.node.compound;
 
-  fprintf(ctx.out, "typedef %s %s %s;\n", compound_kind, item.ident.name, item.ident.name);
+  fprintf(ctx.out, "typedef %s %s %s;\n", compound_kind, compound_name, compound_name);
 
   if data.num_fields > 0 {
-    fprintf(ctx.out, "typedef %s %s {\n", compound_kind, item.ident.name);
+    fprintf(ctx.out, "typedef %s %s {\n", compound_kind, compound_name);
     var i: u32 = 0;
     while i < data.num_fields {
       generate_type(ctx, data.fields[i].ty);
-      fprintf(ctx.out, "%s;\n", data.fields[i].ident.name);
+
+      var field_name: *char = get_str(&sess.interner, data.fields[i].ident.name);
+      fprintf(ctx.out, " %s;\n", field_name);
       i = i + 1;
     }
-    fprintf(ctx.out, "} %s;\n\n", item.ident.name);
+    fprintf(ctx.out, "} %s;\n\n", compound_name);
   }
 }
 
@@ -284,11 +325,12 @@ fn generate_item(ctx: *CodegenContext, item: *Item) {
   fprintf(ctx.out, "\n");
 }
 
-fn generate(items: **Item, num_items: u32, output_file: *char) {
+fn generate(sess: *Session, items: **Item, num_items: u32, output_file: *char) {
   var ctx: CodegenContext;
 
   ctx.out = fopen(output_file, "w");
   ctx.ident_is_ptr = strmap_create(1024);
+  ctx.sess = sess;
 
   generate_prelude(&ctx);
 

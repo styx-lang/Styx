@@ -61,7 +61,9 @@ fn strmap_lookup(map: *StrMap, key: *char) -> u32 {
   var h: u32 = strmap_hash(key) % map.size;
   while (true) {
     if map.keys[h] == null  return null;
-    if !strcmp(map.keys[h],key)  return map.values[h];
+    if !strcmp(map.keys[h],key) {
+      return map.values[h];
+    }
     h = (h + 1) % map.size;
   }
 }

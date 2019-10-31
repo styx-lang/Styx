@@ -71,7 +71,7 @@ fn source_snippet(m: *SourceMap, span: Span) {
     i = i + 1;
   }
 
-  printf("%s:%u\n", file.name, line_first);
+  printf("%s:%u\n", file.name, line_first + 1);
 
   var buffer: *char = malloc(1024);
   i = line_first;

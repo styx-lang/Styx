@@ -27,12 +27,12 @@ fn main(argc: int, argv: **char) -> int {
 
   var tokens: *Token;
   var num_tokens: u32;
-  lex(source_file, &tokens, &num_tokens);
+  lex(&sess, source_file, &tokens, &num_tokens);
 
   var num_items: u32;
   val items: **Item = parse(&sess, tokens, num_tokens, &num_items);
 
-  generate(items, num_items, argv[2]);
+  generate(&sess, items, num_items, argv[2]);
 
   return 0;
 }

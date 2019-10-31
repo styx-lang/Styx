@@ -5,6 +5,8 @@ struct LexingContext {
   source: *SourceFile,
   tokens: *Token,
   current_token_idx: u32,
+  sess: *Session,
+  lexeme_buffer: *char,
 }
 
 fn is_alphabetic(c: char) -> bool {
@@ -36,7 +38,7 @@ fn advance(ctx: *LexingContext) -> char {
   return source.content[ctx.current - 1]
 }
 
-fn add_token(ctx: *LexingContext, kind: TokenKind, lexeme: *char) {
+fn add_token(ctx: *LexingContext, kind: TokenKind, lexeme: Sid) {
   var token: Token;
   token.kind = kind;
   token.lexeme = lexeme;
@@ -47,7 +49,9 @@ fn add_token(ctx: *LexingContext, kind: TokenKind, lexeme: *char) {
 }
 
 fn add_simple_token(ctx: *LexingContext, kind: TokenKind) {
-  add_token(ctx, kind, null);
+  var null_sid: Sid;
+  null_sid.x = 0;
+  add_token(ctx, kind, null_sid);
 }
 
 fn add_lookahead_conditional_token(ctx: *LexingContext, expect: char, first: TokenKind, second: TokenKind) {
@@ -58,7 +62,9 @@ fn add_lookahead_conditional_token(ctx: *LexingContext, expect: char, first: Tok
   } else {
     kind = second;
   }
-  add_token(ctx, kind, null);
+  var null_sid: Sid;
+  null_sid.x = 0;
+  add_token(ctx, kind, null_sid);
 }
 
 fn read_newline(ctx: *LexingContext) {
@@ -67,13 +73,15 @@ fn read_newline(ctx: *LexingContext) {
   source.num_lines = source.num_lines + 1;
 }
 
-fn get_lexeme(ctx: *LexingContext, start_offset: u32, end_offset: u32) -> *char {
+fn get_lexeme(ctx: *LexingContext, start_offset: u32, end_offset: u32) -> Sid {
   val str_len: u32 = ctx.current - (ctx.start + start_offset + end_offset);
-  var str: *char = malloc(str_len + 1);
   var source: *SourceFile = ctx.source;
-  memcpy(str, &source.content[ctx.start + start_offset], str_len);
-  str[str_len] = 0;
-  return str;
+  memcpy(ctx.lexeme_buffer, &source.content[ctx.start + start_offset], str_len);
+  ctx.lexeme_buffer[str_len] = 0
+  var sess: *Session = ctx.sess;
+  var sid: Sid = intern(&sess.interner, ctx.lexeme_buffer);
+  //printf("%s -> %u, %u\n", ctx.lexeme_buffer, sid.x, ctx.start);
+  return sid;
 }
 
 fn single_line_comment(ctx: *LexingContext) {
@@ -121,8 +129,7 @@ fn lex_char(ctx: *LexingContext) {
   //Consume closing '
   advance(ctx);
 
-  var lexeme: *char = get_lexeme(ctx, 1, 1);
-  add_token(ctx, TokenKind::Char, lexeme);
+  add_token(ctx, TokenKind::Char, get_lexeme(ctx, 1, 1));
 }
 
 fn lex_string(ctx: *LexingContext) {
@@ -144,8 +151,7 @@ fn lex_string(ctx: *LexingContext) {
   //Consume closing "
   advance(ctx);
 
-  var lexeme: *char = get_lexeme(ctx, 1, 1);
-  add_token(ctx, TokenKind::String, lexeme);
+  add_token(ctx, TokenKind::String, get_lexeme(ctx, 1, 1));
 }
 
 fn lex_number(ctx: *LexingContext) {
@@ -158,18 +164,21 @@ fn lex_number(ctx: *LexingContext) {
     while is_digit(peek_token(ctx,0))  advance(ctx);
   }
 
-  val lexeme: *char = get_lexeme(ctx, 0, 0);
   var t: TokenKind;
   if dot_encountered  t = TokenKind::Float;
   else  t = TokenKind::Integer;
 
-  add_token(ctx, t, lexeme);
+  add_token(ctx, t, get_lexeme(ctx, 0, 0));
 }
 
 fn lex_identifier(ctx: *LexingContext) {
   while (is_alphanumeric(peek_token(ctx, 0)) || peek_token(ctx, 0) == '_') advance(ctx);
-  val lexeme: *char = get_lexeme(ctx, 0, 0);
-  val keyword: TokenKind = is_keyword(lexeme);
+
+  val lexeme: Sid = get_lexeme(ctx, 0, 0);
+
+  var sess: *Session = ctx.sess;
+  val lexeme_str: *char = get_str(&sess.interner, lexeme);
+  val keyword: TokenKind = is_keyword(lexeme_str);
   if keyword != TokenKind::Invalid  add_simple_token(ctx, keyword);
   else  add_token(ctx, TokenKind::Identifier, lexeme);
 }
@@ -229,7 +238,7 @@ fn scan_token(ctx: *LexingContext) {
   }
 }
 
-fn lex(source: *SourceFile, tokens: **Token, num_tokens: *u32) {
+fn lex(sess: *Session, source: *SourceFile, tokens: **Token, num_tokens: *u32) {
 
   var ctx: *LexingContext = malloc(sizeof(LexingContext));
   ctx.source = source;
@@ -237,6 +246,9 @@ fn lex(source: *SourceFile, tokens: **Token, num_tokens: *u32) {
   ctx.current = 0;
   ctx.tokens = malloc(sizeof(Token) * 5000);
   ctx.current_token_idx = 0;
+  ctx.sess = sess;
+
+  ctx.lexeme_buffer = malloc(1024);
 
   while !is_done_lexing(ctx) {
     ctx.start = ctx.current;

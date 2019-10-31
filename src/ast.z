@@ -9,11 +9,11 @@ struct HirId {
 }
 
 struct Ident {
-  name: *char,
+  name: Sid,
 }
 
 struct Path {
-  segments: **char,
+  segments: *Ident,
   num_segments: u32,
 }
 
@@ -25,7 +25,7 @@ enum TypeKind {
 
 
 union TypeKindNode {
-  path: *char,
+  path: Sid,
   ptr: *Type,
 }
 
@@ -124,7 +124,7 @@ union LiteralValue {
   integer: u64,
   boolean: bool,
   ch: char,
-  str: *char,
+  str: Sid,
 }
 
 struct Literal {
