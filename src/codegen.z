@@ -69,7 +69,7 @@ fn generate_unary(ctx: *CodegenContext, unary: UnaryData) {
   else if unary.op == UnaryOperatorKind::Refer  fprintf(ctx.out, "&");
   else if unary.op == UnaryOperatorKind::Deref  fprintf(ctx.out, "*");
   else abort();
-  
+
   generate_expr(ctx, unary.inner);
 }
 
@@ -222,21 +222,22 @@ fn generate_variable(ctx: *CodegenContext, item: *Item) {
 }
 
 fn generate_function(ctx: *CodegenContext, item: *Item) {
-  val data: FunctionData = item.node.function;
-  generate_type(ctx, data.output);
+  val func: FunctionData = item.node.function;
+  val header: FunctionHeader = func.header;
+  generate_type(ctx, header.output);
 
   fprintf(ctx.out, " %s(", item.ident.name);
 
   var i: u32 = 0;
-  while i < data.num_parameters {
-    generate_type(ctx, data.parameters[i].ty);
-  strmap_insert(ctx.ident_is_ptr, data.parameters[i].name.name, type_is_ptr(data.parameters[i].ty));
-    fprintf(ctx.out, " %s", data.parameters[i].name.name);
-    if i < data.num_parameters - 1  fprintf(ctx.out, ", ");
+  while i < header.num_parameters {
+    generate_type(ctx, header.parameters[i].ty);
+  strmap_insert(ctx.ident_is_ptr, header.parameters[i].ident.name, type_is_ptr(header.parameters[i].ty));
+    fprintf(ctx.out, " %s", header.parameters[i].ident.name);
+    if i < header.num_parameters - 1  fprintf(ctx.out, ", ");
     i = i + 1;
   }
   fprintf(ctx.out, ") ");
-  if data.body  generate_block(ctx, data.body);
+  if func.body  generate_block(ctx, func.body);
   else  fprintf(ctx.out, ";\n");
 }
 
