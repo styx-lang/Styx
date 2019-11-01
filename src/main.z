@@ -31,6 +31,8 @@ fn main(argc: int, argv: **char) -> int {
 
   val unit: CompilationUnit = parse(&sess, tokens, num_tokens);
 
+  resolve(&sess, &unit);
+
   generate(&sess, unit, argv[2]);
 
   return 0;

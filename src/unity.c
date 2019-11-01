@@ -7,5 +7,6 @@
 #include "lexer.c"
 #include "ast.c"
 #include "parser.c"
+#include "resolution.c"
 #include "codegen.c"
 #include "main.c"

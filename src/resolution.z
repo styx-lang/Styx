@@ -1,0 +1,69 @@
+
+struct Scope {
+  symbols: *IntMap,
+}
+
+struct ResolutionContext {
+  scope_stack: *Scope,
+  stack_top: u32,
+}
+
+fn encode_id(id: NodeId) -> u64 {
+  var owner: u64 = id.owner;
+  var v: u64 = (owner << 32) | id.local;
+  return v;
+}
+
+fn decode_id(v: u64) -> NodeId {
+  var id: NodeId;
+  id.owner = v >> 32;
+  id.local = v;
+  return id;
+}
+
+fn push_symbol(ctx: *ResolutionContext, ident: Ident, id: NodeId) {
+  intmap_insert(ctx.scope_stack[ctx.stack_top].symbols, ident.name.x, encode_id(id));
+}
+
+fn push_scope(ctx: *ResolutionContext) {
+  ctx.stack_top = ctx.stack_top + 1;
+}
+
+fn pop_scope(ctx: *ResolutionContext) {
+  intmap_reset(ctx.scope_stack[ctx.stack_top].symbols);
+  ctx.stack_top = ctx.stack_top - 1;
+}
+
+fn scan_item(ctx: *ResolutionContext, item: *Item) {
+  push_symbol(ctx, item.ident, item.id);
+}
+
+fn resolve_item(ctx: *ResolutionContext, item: *Item) {
+  //TODO
+}
+
+fn resolve(sess: *Session, unit: *CompilationUnit) {
+  var ctx: ResolutionContext;
+
+  ctx.scope_stack = malloc(sizeof(Scope) * 16);
+  ctx.stack_top = 0;
+  var i: u32 = 0;
+  while i < 16 {
+    ctx.scope_stack[i].symbols = intmap_create(1024);
+    i = i + 1;
+  }
+
+  i = 0;
+  while i < unit.num_root_items {
+    var item: *Item = unit_get_item(unit, unit.root_items[i]);
+    scan_item(&ctx, item);
+    i = i + 1;
+  }
+
+  i = 0;
+  while i < unit.num_root_items {
+    var item: *Item = unit_get_item(unit, unit.root_items[i]);
+    resolve_item(&ctx, item);
+    i = i + 1;
+  }
+}
