@@ -161,8 +161,8 @@ fn generate_field(ctx: *CodegenContext, field: FieldData) {
 
   var is_ptr: bool = false;
   var accessor_str: *char;
-  if strct.kind == ExprKind::Identifier {
-    var strct_name: *char = get_str(&sess.interner, strct.node.ident.name)
+  if strct.kind == ExprKind::Path {
+    var strct_name: *char = get_str(&sess.interner, strct.node.path.segments[0].name)
     is_ptr = strmap_lookup(ctx.ident_is_ptr, strct_name);
   }
 
@@ -172,7 +172,6 @@ fn generate_field(ctx: *CodegenContext, field: FieldData) {
 }
 
 fn generate_path(ctx: *CodegenContext, path: Path) {
-  fprintf(ctx.out, "_");
   var i: u32 = 0;
   while i < path.num_segments {
     generate_identifier(ctx, path.segments[i]);
@@ -190,7 +189,6 @@ fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
    else if expr.kind == ExprKind::Indexing  generate_indexing(ctx, expr.node.indexing);
    else if expr.kind == ExprKind::Field  generate_field(ctx, expr.node.field);
    else if expr.kind == ExprKind::Literal  generate_literal(ctx, expr.node.lit);
-   else if expr.kind == ExprKind::Identifier  generate_identifier(ctx, expr.node.ident);
    else if expr.kind == ExprKind::Path  generate_path(ctx, expr.node.path);
    else abort();
 }
@@ -289,7 +287,7 @@ fn generate_enum(ctx: *CodegenContext, item: *Item) {
 
   while i < data.num_variants {
     var variant_name: *char = get_str(&sess.interner, data.variants[i].ident.name);
-    fprintf(ctx.out, "_%s_%s,\n", enum_name, variant_name);
+    fprintf(ctx.out, "%s_%s,\n", enum_name, variant_name);
     i = i + 1;
   }
   fprintf(ctx.out, "} %s;\n\n", enum_name);

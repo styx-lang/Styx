@@ -67,6 +67,13 @@ fn parse_path(ctx: *ParsingContext) -> Path {
   return path;
 }
 
+fn parse_path_expr(ctx: *ParsingContext) -> *Expr {
+  var expr: *Expr = malloc(sizeof(Expr));
+  expr.kind = ExprKind::Path;
+  expr.node.path = parse_path(ctx);
+  return expr;
+}
+
 fn parse_type(ctx: *ParsingContext) -> *Type {
   var node: TypeKindNode;
   var kind: TypeKind;
@@ -226,14 +233,6 @@ fn parse_bool_literal(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_identifier_expr(ctx: *ParsingContext) -> *Expr {
-  var tok: Token = expect(ctx, TokenKind::Identifier);
-  var expr: *Expr = malloc(sizeof(Expr));
-  expr.kind = ExprKind::Identifier;
-  expr.node.ident.name = tok.lexeme;
-  return expr;
-}
-
 fn parse_call(ctx: *ParsingContext, left: *Expr) -> *Expr {
 
   var result: *Expr = malloc(sizeof(Expr));
@@ -372,17 +371,11 @@ fn parse_if(ctx: *ParsingContext) -> *Expr {
 
 fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
   val tok: Token = look_ahead(ctx, 0);
-  val next: Token = look_ahead(ctx, 1);
 
   var left : *Expr;
 
-  if tok.kind == TokenKind::Identifier {
-    if next.kind == TokenKind::ColonColon  {
-      left = malloc(sizeof(Expr));
-      left.kind = ExprKind::Path;
-      left.node.path = parse_path(ctx);
-    } else  left = parse_identifier_expr(ctx);
-  } else if tok.kind == TokenKind::Integer  left = parse_integer_literal(ctx);
+  if tok.kind == TokenKind::Identifier  left = parse_path_expr(ctx);
+  else if tok.kind == TokenKind::Integer  left = parse_integer_literal(ctx);
   else if tok.kind == TokenKind::Char  left = parse_char_literal(ctx);
   else if tok.kind == TokenKind::String  left = parse_string_literal(ctx);
   else if tok.kind == TokenKind::Float  left = parse_float_literal(ctx);
