@@ -3,6 +3,7 @@ struct CodegenContext {
   out: *FILE,
   ident_is_ptr: *StrMap,
   sess: *Session,
+  unit: *CompilationUnit,
 }
 
 fn generate_expr(ctx: *CodegenContext, expr: *Expr)
@@ -76,6 +77,10 @@ fn generate_literal(ctx: *CodegenContext, lit: Literal) {
   else abort();
 }
 
+fn generate_body(ctx: *CodegenContext, body: Body) {
+  generate_expr(ctx, body.value);
+}
+
 fn generate_unary(ctx: *CodegenContext, unary: UnaryData) {
   if unary.op == UnaryOperatorKind::Negation  fprintf(ctx.out, "-");
   else if unary.op == UnaryOperatorKind::Complement  fprintf(ctx.out, "!");
@@ -133,10 +138,10 @@ fn generate_conditional(ctx: *CodegenContext, cond: ConditionalData) {
   fprintf(ctx.out, "if (");
   generate_expr(ctx, cond.condition);
   fprintf(ctx.out, ")");
-  generate_block(ctx, cond.then);
+  generate_expr(ctx, cond.then);
   if (cond.otherwise) {
     fprintf(ctx.out, "else ");
-    generate_block(ctx, cond.otherwise);
+    generate_expr(ctx, cond.otherwise);
   }
 }
 
@@ -207,7 +212,7 @@ fn generate_while(ctx: *CodegenContext, data: *WhileData) {
   fprintf(ctx.out, "while ( ");
   generate_expr(ctx, data.condition);
   fprintf(ctx.out, ")\n");
-  generate_block(ctx, data.body);
+  generate_expr(ctx, data.body);
 }
 
 fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt) {
@@ -215,7 +220,7 @@ fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt) {
   else if stmt.kind == StmtKind::Break  fprintf(ctx.out, "break;\n");
   else if stmt.kind == StmtKind::Continue  fprintf(ctx.out, "continue;\n");
   else if stmt.kind == StmtKind::Expr { generate_expr(ctx, stmt.node.expr); fprintf(ctx.out, ";\n"); }
-  else if stmt.kind == StmtKind::Item  generate_item(ctx, stmt.node.item);
+  else if stmt.kind == StmtKind::Item  generate_item(ctx, unit_get_item(ctx.unit, stmt.node.item));
   else if stmt.kind == StmtKind::Return  generate_return(ctx, stmt.node._return);
   else if stmt.kind == StmtKind::While  generate_while(ctx, &stmt.node._while);
   else abort();
@@ -240,9 +245,9 @@ fn generate_variable(ctx: *CodegenContext, item: *Item) {
 
   strmap_insert(ctx.ident_is_ptr, var_name, type_is_ptr(item.node.variable.ty));
   fprintf(ctx.out, " %s ", var_name);
-  if item.node.variable.body > 0 {
+  if item.node.variable.body.local {
     fprintf(ctx.out, "= ");
-    generate_expr(ctx, item.node.variable.body);
+    generate_body(ctx, unit_get_body(ctx.unit, item.node.variable.body));
   }
   fprintf(ctx.out, ";\n");
 }
@@ -268,7 +273,7 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
     i = i + 1;
   }
   fprintf(ctx.out, ") ");
-  if func.body  generate_block(ctx, func.body);
+  if func.body.local  generate_body(ctx, unit_get_body(ctx.unit, func.body));
   else  fprintf(ctx.out, ";\n");
 }
 
@@ -318,6 +323,7 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
 }
 
 fn generate_item(ctx: *CodegenContext, item: *Item) {
+
   if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  generate_variable(ctx, item);
   else if item.kind == ItemKind::Enum   generate_enum(ctx, item);
   else if item.kind == ItemKind::Function   generate_function(ctx, item);
@@ -325,18 +331,20 @@ fn generate_item(ctx: *CodegenContext, item: *Item) {
   fprintf(ctx.out, "\n");
 }
 
-fn generate(sess: *Session, items: **Item, num_items: u32, output_file: *char) {
+fn generate(sess: *Session, unit: CompilationUnit, output_file: *char) {
   var ctx: CodegenContext;
 
   ctx.out = fopen(output_file, "w");
   ctx.ident_is_ptr = strmap_create(1024);
   ctx.sess = sess;
+  ctx.unit = &unit;
 
   generate_prelude(&ctx);
 
   var i: u32 = 0;
-  while i < num_items {
-    generate_item(&ctx, items[i]);
+  while i < unit.num_root_items {
+    var item: *Item = unit_get_item(ctx.unit, unit.root_items[i]);
+    generate_item(&ctx, item);
     i = i + 1;
   }
 }

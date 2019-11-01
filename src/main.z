@@ -29,10 +29,9 @@ fn main(argc: int, argv: **char) -> int {
   var num_tokens: u32;
   lex(&sess, source_file, &tokens, &num_tokens);
 
-  var num_items: u32;
-  val items: **Item = parse(&sess, tokens, num_tokens, &num_items);
+  val unit: CompilationUnit = parse(&sess, tokens, num_tokens);
 
-  generate(&sess, items, num_items, argv[2]);
+  generate(&sess, unit, argv[2]);
 
   return 0;
 }

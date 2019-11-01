@@ -1,3 +1,4 @@
+#include "intmap.c"
 #include "strmap.c"
 #include "error.c"
 #include "interning.c"

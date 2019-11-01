@@ -3,7 +3,7 @@ struct Type {}
 struct Expr {}
 struct Block {}
 
-struct HirId {
+struct NodeId {
   owner: u32,
   local: u32,
 }
@@ -30,85 +30,9 @@ union TypeKindNode {
 }
 
 struct Type {
-  id: HirId,
+  id: NodeId,
   kind: TypeKind,
   node: TypeKindNode,
-}
-
-enum VisibilityKind {
-  Public,
-  Private,
-}
-
-struct Visibility {
-  kind: VisibilityKind,
-}
-
-struct CompoundField {
-  ident: Ident,
-  id: HirId,
-  ty: *Type,
-}
-
-struct CompoundData {
-  fields: *CompoundField,
-  num_fields: u32,
-}
-
-struct EnumVariant {
-  ident: Ident,
-  id: HirId,
-}
-
-struct EnumData {
-  variants: *EnumVariant,
-  num_variants: u32,
-}
-
-struct FunctionParameter {
-  ident: Ident,
-  ty: *Type,
-}
-
-struct FunctionHeader {
-  parameters: *FunctionParameter,
-  num_parameters: u32,
-  output: *Type,
-}
-
-struct FunctionData {
-  header: FunctionHeader,
-  body: *Block,
-}
-
-struct VariableData {
-  ty: *Type,
-  mutable: bool,
-  body: *Expr,
-}
-
-enum ItemKind {
-  Const,
-  Enum,
-  Function,
-  Struct,
-  Union,
-  Variable,
-}
-
-union ItemKindNode {
-  compound: CompoundData,
-  _enum: EnumData,
-  variable: VariableData,
-  function: FunctionData,
-}
-
-struct Item {
-  ident: Ident,
-  id: HirId,
-  kind: ItemKind,
-  node: ItemKindNode,
-  vis: Visibility,
 }
 
 enum LiteralKind {
@@ -187,8 +111,8 @@ struct CallData {
 
 struct ConditionalData {
   condition: *Expr,
-  then: *Block,
-  otherwise: *Block,
+  then: *Expr,
+  otherwise: *Expr,
 }
 
 struct IndexingData {
@@ -233,7 +157,7 @@ union ExprKindNode {
 }
 
 struct Expr {
-  id: HirId,
+  id: NodeId,
   kind: ExprKind,
   node: ExprKindNode,
 }
@@ -245,7 +169,7 @@ struct AssignmentData {
 
 struct WhileData {
   condition: *Expr,
-  body: *Block,
+  body: *Expr,
 }
 
 enum StmtKind {
@@ -262,7 +186,7 @@ enum StmtKind {
 
 union StmtKindNode {
   assignment: AssignmentData,
-  item: *Item,
+  item: NodeId,
   expr: *Expr,
   _while: WhileData,
   _return: *Expr,
@@ -277,5 +201,144 @@ struct Stmt {
 struct Block {
   stmts: **Stmt,
   num_stmts: u32,
-  id: HirId,
+  id: NodeId,
+}
+
+struct Body {
+  value: *Expr,
+}
+
+enum VisibilityKind {
+  Public,
+  Private,
+}
+
+struct Visibility {
+  kind: VisibilityKind,
+}
+
+struct CompoundField {
+  ident: Ident,
+  id: NodeId,
+  ty: *Type,
+}
+
+struct CompoundData {
+  fields: *CompoundField,
+  num_fields: u32,
+}
+
+struct EnumVariant {
+  ident: Ident,
+  id: NodeId,
+}
+
+struct EnumData {
+  variants: *EnumVariant,
+  num_variants: u32,
+}
+
+struct FunctionParameter {
+  ident: Ident,
+  ty: *Type,
+}
+
+struct FunctionHeader {
+  parameters: *FunctionParameter,
+  num_parameters: u32,
+  output: *Type,
+}
+
+struct FunctionData {
+  header: FunctionHeader,
+  body: NodeId,
+}
+
+struct VariableData {
+  ty: *Type,
+  mutable: bool,
+  body: NodeId,
+}
+
+enum ItemKind {
+  Const,
+  Enum,
+  Function,
+  Struct,
+  Union,
+  Variable,
+}
+
+union ItemKindNode {
+  compound: CompoundData,
+  _enum: EnumData,
+  variable: VariableData,
+  function: FunctionData,
+}
+
+struct Item {
+  ident: Ident,
+  id: NodeId,
+  kind: ItemKind,
+  node: ItemKindNode,
+  vis: Visibility,
+}
+
+struct CompilationUnit {
+  body_map: *IntMap,
+  bodies: *Body,
+  num_bodies: u32,
+
+  item_map: *IntMap,
+  items: *Item,
+  num_items: u32,
+
+  root_items: *NodeId,
+  num_root_items: u32,
+}
+
+fn unit_create_body(unit: *CompilationUnit, id: *NodeId) -> *Body {
+  var body: *Body = &unit.bodies[unit.num_bodies];
+  unit.num_bodies = unit.num_bodies + 1;
+
+  val owner: u64 = 0;
+  val local: u64 = unit.num_bodies;
+  //val key: u64 = (owner << 32) | local;
+  //intmap_insert(unit.body_map, key, unit.num_bodies);
+
+  id.owner = owner;
+  id.local = local;
+
+  return body;
+}
+
+fn unit_get_body(unit: *CompilationUnit, id: NodeId) -> Body {
+  //val owner: u64 = id.owner;
+  //val key: u64 = (owner << 32) | (id.local);
+  //val idx: u32 = intmap_lookup(unit.body_map, key);
+  return unit.bodies[id.local - 1];
+}
+
+fn unit_create_item(unit: *CompilationUnit, id: *NodeId) -> *Item {
+
+  var item: *Item = &unit.items[unit.num_items];
+  unit.num_items = unit.num_items + 1;
+
+  val owner: u64 = unit.num_items;
+  val local: u64 = 0;
+  //val key: u64 = (owner << 32) | (id.local);
+  //intmap_insert(unit.item_map, key, unit.num_items);
+
+  id.owner = owner;
+  id.local = local;
+  item.id = *id;
+
+  return item;
+}
+
+fn unit_get_item(unit: *CompilationUnit, id: NodeId) -> *Item {
+  //val owner: u64 = id.owner;
+  //val key: u64 = (owner << 32) | (id.local);
+  //val idx: u32 = intmap_lookup(unit.item_map, key);
+  return &unit.items[id.owner - 1];
 }

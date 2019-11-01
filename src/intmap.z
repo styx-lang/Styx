@@ -1,0 +1,68 @@
+
+struct IntMap {
+  keys: *u64,
+  values: *u32,
+  size: u64,
+  load: u64,
+}
+
+fn intmap_create(size: u64) -> *IntMap {
+  var map: *IntMap = malloc(sizeof(IntMap));
+
+  map.size = size;
+  map.load = 0;
+  map.keys = malloc(size*8);
+  map.values = malloc(size*4);
+
+  var i: u32 = 0;
+  while i < size {
+    map.keys[i] = 0;
+    map.values[i] = null;
+    i = i + 1;
+  }
+
+  return map;
+}
+
+fn intmap_hash(k: u64) -> u64 {
+  if k != null  return k;
+  else return 1;
+}
+
+fn intmap_insert(map: *IntMap, key: u64, value: u32) {
+  val h: u64 = intmap_hash(key) % map.size;
+  if map.load + 1 >= map.size {
+    printf("Hashmap of size %lu is full!\n", map.size);
+    exit(-1);
+  }
+  while true {
+    if map.keys[h] == key {
+      map.values[h] = value;
+      break;
+    } else if map.keys[h] == null {
+      map.keys[h] = key;
+      map.values[h] = value;
+      map.load = map.load + 1;
+      break;
+    } else {
+      h = (h + 1) % map.size;
+    }
+  }
+}
+
+fn intmap_lookup(map: *IntMap, key: u64) -> u32 {
+  var h: u64 = intmap_hash(key) % map.size;
+  while (true) {
+    if map.keys[h] == null  return null;
+    if map.keys[h] == key {
+      return map.values[h];
+    }
+    h = (h + 1) % map.size;
+  }
+}
+
+fn intmap_destroy(map: *IntMap) {
+  free(map.keys);
+  free(map.values);
+  free(map);
+}
