@@ -5,6 +5,8 @@ struct ParsingContext {
   source_map: *SourceMap,
   sess: *Session,
   unit: CompilationUnit,
+  next_owner: u32,
+  current_owner: u32,
 }
 
 fn is_done_parsing(ctx: *ParsingContext) -> bool {
@@ -461,9 +463,9 @@ fn parse_stmt(ctx: *ParsingContext) -> *Stmt {
   return stmt;
 }
 
-fn parse_body(ctx: *ParsingContext) -> NodeId {
+fn parse_body(ctx: *ParsingContext, owner: NodeId) -> NodeId {
   var id: NodeId;
-  var body: *Body = unit_create_body(&ctx.unit, &id);
+  var body: *Body = unit_create_body(&ctx.unit, owner, &id);
 
   body.value = parse_expression(ctx, 0);
 
@@ -481,7 +483,7 @@ fn parse_variable_decl(ctx: *ParsingContext, item: *Item) {
   expect(ctx, TokenKind::Colon);
   item.node.variable.ty = parse_type(ctx);
 
-  if accept(ctx, TokenKind::Equal)  item.node.variable.body = parse_body(ctx);
+  if accept(ctx, TokenKind::Equal)  item.node.variable.body = parse_body(ctx, item.id);
   else  item.node.variable.body.owner = null;
 }
 
@@ -571,7 +573,7 @@ fn parse_function_decl(ctx: *ParsingContext, item: *Item) {
 
   item.node.function.header = parse_function_header(ctx);
 
-  if look_ahead(ctx, 0).kind == TokenKind::LeftCurly  item.node.function.body = parse_body(ctx);
+  if look_ahead(ctx, 0).kind == TokenKind::LeftCurly  item.node.function.body = parse_body(ctx, item.id);
   else  item.node.function.body.owner = null;
 }
 
@@ -605,11 +607,11 @@ fn parse(sess: *Session, tokens: *Token, num_tokens: u32) -> CompilationUnit {
 
   ctx.unit.body_map = intmap_create(2048);
   ctx.unit.bodies = malloc(sizeof(Body) * 2048);
-  ctx.unit.num_bodies = 0;
+  ctx.unit.num_bodies = 1; //Reserve zero idx for null body
 
   ctx.unit.item_map = intmap_create(2048);
   ctx.unit.items = malloc(sizeof(Item) * 2048);
-  ctx.unit.num_items = 0;
+  ctx.unit.num_items = 1; //Reserve zero idx for null item
 
   ctx.unit.root_items = malloc(sizeof(NodeId) * 2048);
   ctx.unit.num_root_items = 0;

@@ -12,9 +12,23 @@ struct Ident {
   name: Sid,
 }
 
+enum ResKind {
+  Definition,
+}
+
+union ResNode {
+  def: NodeId,
+}
+
+struct Res {
+  kind: ResKind,
+  node: ResNode,
+}
+
 struct Path {
   segments: *Ident,
   num_segments: u32,
+  res: Res,
 }
 
 enum TypeKind {
@@ -241,6 +255,7 @@ struct EnumData {
 
 struct FunctionParameter {
   ident: Ident,
+  id: NodeId,
   ty: *Type,
 }
 
@@ -299,14 +314,16 @@ struct CompilationUnit {
   num_root_items: u32,
 }
 
-fn unit_create_body(unit: *CompilationUnit, id: *NodeId) -> *Body {
-  var body: *Body = &unit.bodies[unit.num_bodies];
+fn unit_create_body(unit: *CompilationUnit, owner_item: NodeId, id: *NodeId) -> *Body {
+
+  val idx: u32 = unit.num_bodies;
+  var body: *Body = &unit.bodies[idx];
   unit.num_bodies = unit.num_bodies + 1;
 
-  val owner: u64 = 0;
-  val local: u64 = unit.num_bodies;
-  //val key: u64 = (owner << 32) | local;
-  //intmap_insert(unit.body_map, key, unit.num_bodies);
+  val owner: u64 = owner_item.owner;
+  val local: u64 = 1;
+  val key: u64 = (owner << 32) | local;
+  intmap_insert(unit.body_map, key, idx);
 
   id.owner = owner;
   id.local = local;
@@ -315,21 +332,22 @@ fn unit_create_body(unit: *CompilationUnit, id: *NodeId) -> *Body {
 }
 
 fn unit_get_body(unit: *CompilationUnit, id: NodeId) -> Body {
-  //val owner: u64 = id.owner;
-  //val key: u64 = (owner << 32) | (id.local);
-  //val idx: u32 = intmap_lookup(unit.body_map, key);
-  return unit.bodies[id.local - 1];
+  val owner: u64 = id.owner;
+  val key: u64 = (owner << 32) | (id.local);
+  val idx: u32 = intmap_lookup(unit.body_map, key);
+  return unit.bodies[idx];
 }
 
 fn unit_create_item(unit: *CompilationUnit, id: *NodeId) -> *Item {
 
-  var item: *Item = &unit.items[unit.num_items];
+  val idx: u32 = unit.num_items;
+  var item: *Item = &unit.items[idx];
   unit.num_items = unit.num_items + 1;
 
-  val owner: u64 = unit.num_items;
+  val owner: u64 = idx;
   val local: u64 = 0;
-  //val key: u64 = (owner << 32) | (id.local);
-  //intmap_insert(unit.item_map, key, unit.num_items);
+  val key: u64 = (owner << 32) | local;
+  intmap_insert(unit.item_map, key, idx);
 
   id.owner = owner;
   id.local = local;
@@ -339,8 +357,8 @@ fn unit_create_item(unit: *CompilationUnit, id: *NodeId) -> *Item {
 }
 
 fn unit_get_item(unit: *CompilationUnit, id: NodeId) -> *Item {
-  //val owner: u64 = id.owner;
-  //val key: u64 = (owner << 32) | (id.local);
-  //val idx: u32 = intmap_lookup(unit.item_map, key);
-  return &unit.items[id.owner - 1];
+  val owner: u64 = id.owner;
+  val key: u64 = (owner << 32) | (id.local);
+  val idx: u32 = intmap_lookup(unit.item_map, key);
+  return &unit.items[idx];
 }

@@ -1,11 +1,16 @@
 
 struct Scope {
   symbols: *IntMap,
+  current_owner: u32,
+  next_local: u32,
 }
 
 struct ResolutionContext {
   scope_stack: *Scope,
   stack_top: u32,
+  unit: *CompilationUnit,
+  source_map: *SourceMap,
+  interner: *Interner,
 }
 
 fn encode_id(id: NodeId) -> u64 {
@@ -21,12 +26,28 @@ fn decode_id(v: u64) -> NodeId {
   return id;
 }
 
-fn push_symbol(ctx: *ResolutionContext, ident: Ident, id: NodeId) {
+fn push_ident(ctx: *ResolutionContext, ident: Ident, id: NodeId) {
   intmap_insert(ctx.scope_stack[ctx.stack_top].symbols, ident.name.x, encode_id(id));
+}
+
+fn lookup_ident(ctx: *ResolutionContext, ident: Ident, id: *NodeId) -> bool {
+  var i: i32 = ctx.stack_top;
+
+  while i >= 0 {
+    var v: u64 = intmap_lookup(ctx.scope_stack[i].symbols, ident.name.x);
+    if v > 0 {
+      *id = decode_id(v);
+      return true;
+    }
+    i = i - 1;
+  }
+  return false;
 }
 
 fn push_scope(ctx: *ResolutionContext) {
   ctx.stack_top = ctx.stack_top + 1;
+  ctx.scope_stack[ctx.stack_top].current_owner = ctx.scope_stack[ctx.stack_top - 1].current_owner;
+  ctx.scope_stack[ctx.stack_top].next_local = 2;
 }
 
 fn pop_scope(ctx: *ResolutionContext) {
@@ -35,20 +56,159 @@ fn pop_scope(ctx: *ResolutionContext) {
 }
 
 fn scan_item(ctx: *ResolutionContext, item: *Item) {
-  push_symbol(ctx, item.ident, item.id);
+  push_ident(ctx, item.ident, item.id);
+}
+
+fn resolve_path(ctx: *ResolutionContext, path: *Path) {
+  var id: NodeId;
+  if lookup_ident(ctx, path.segments[0], &id) {
+    path.res.kind = ResKind::Definition;
+    path.res.node.def = id;
+  }
+  else {
+    printf("Failed to resolve %s\n", get_str(ctx.interner, path.segments[0].name));
+  }
+}
+
+fn resolve_expr(ctx: *ResolutionContext, expr: *Expr)
+fn resolve_block(ctx: *ResolutionContext, block: *Block)
+fn resolve_stmt(ctx: *ResolutionContext, stmt: *Stmt)
+fn resolve_item(ctx: *ResolutionContext, item: *Item)
+
+fn resolve_unary(ctx: *ResolutionContext, unary: UnaryData) {
+  resolve_expr(ctx, unary.inner);
+}
+
+fn resolve_binary(ctx: *ResolutionContext, binary: BinaryData) {
+  resolve_expr(ctx, binary.left);
+  resolve_expr(ctx, binary.right);
+}
+
+fn resolve_call(ctx: *ResolutionContext, call: CallData) {
+  resolve_expr(ctx, call.func);
+
+  var i: u32 = 0;
+  while i < call.num_args {
+    resolve_expr(ctx, call.args[i]);
+    i = i + 1;
+  }
+}
+
+fn resolve_conditional(ctx: *ResolutionContext, cond: ConditionalData) {
+  resolve_expr(ctx, cond.condition);
+  resolve_expr(ctx, cond.then);
+  if (cond.otherwise) {
+    resolve_expr(ctx, cond.otherwise);
+  }
+}
+
+fn resolve_indexing(ctx: *ResolutionContext, idx: IndexingData) {
+  resolve_expr(ctx, idx.array);
+  resolve_expr(ctx, idx.index);
+}
+
+fn resolve_field(ctx: *ResolutionContext, field: FieldData) {
+  resolve_expr(ctx, field.strct);
+}
+
+fn resolve_expr(ctx: *ResolutionContext, expr: *Expr) {
+  if expr.kind == ExprKind::Unary  resolve_unary(ctx, expr.node.unary);
+  else if expr.kind == ExprKind::Binary  resolve_binary(ctx, expr.node.binary);
+  else if expr.kind == ExprKind::Block  resolve_block(ctx, expr.node.block);
+  else if expr.kind == ExprKind::Call  resolve_call(ctx, expr.node.call);
+  else if expr.kind == ExprKind::Conditional  resolve_conditional(ctx, expr.node.conditional);
+  else if expr.kind == ExprKind::Indexing  resolve_indexing(ctx, expr.node.indexing);
+  else if expr.kind == ExprKind::Field  resolve_field(ctx, expr.node.field);
+  else if expr.kind == ExprKind::Path  resolve_path(ctx, &expr.node.path);
+}
+
+fn resolve_assignment(ctx: *ResolutionContext, assignment: AssignmentData) {
+  resolve_expr(ctx, assignment.left);
+  resolve_expr(ctx, assignment.right);
+}
+
+fn resolve_while(ctx: *ResolutionContext, data: WhileData) {
+  resolve_expr(ctx, data.condition);
+  resolve_expr(ctx, data.body);
+}
+
+fn resolve_stmt(ctx: *ResolutionContext, stmt: *Stmt) {
+  if stmt.kind == StmtKind::Assignment resolve_assignment(ctx, stmt.node.assignment);
+  else if stmt.kind == StmtKind::Expr resolve_expr(ctx, stmt.node.expr);
+  else if stmt.kind == StmtKind::Item  resolve_item(ctx, unit_get_item(ctx.unit, stmt.node.item));
+  else if stmt.kind == StmtKind::Return  resolve_expr(ctx, stmt.node._return);
+  else if stmt.kind == StmtKind::While  resolve_while(ctx, stmt.node._while);
+}
+
+fn resolve_block(ctx: *ResolutionContext, block: *Block) {
+
+  push_scope(ctx);
+  var i: u32 = 0;
+  while i < block.num_stmts {
+    var stmt: *Stmt = block.stmts[i];
+    if stmt.kind == StmtKind::Item {
+      var item: *Item = unit_get_item(ctx.unit, stmt.node.item);
+      push_ident(ctx, item.ident, stmt.node.item);
+    }
+    i = i + 1;
+  }
+
+  i = 0;
+  while i < block.num_stmts {
+    resolve_stmt(ctx, block.stmts[i]);
+    i = i + 1;
+  }
+  pop_scope(ctx);
+}
+
+fn resolve_body(ctx: *ResolutionContext, body: Body) {
+  resolve_expr(ctx, body.value);
+}
+
+fn resolve_function(ctx: *ResolutionContext, item: *Item) {
+  val scope: *Scope = &ctx.scope_stack[ctx.stack_top];
+  var func: FunctionData = item.node.function;
+  if func.body.local {
+    scope.current_owner = item.id.owner;
+    push_scope(ctx);
+    var i: u32 = 0;
+    while i < func.header.num_parameters {
+      var param: *FunctionParameter = &func.header.parameters[i];
+      param.id.owner = scope.current_owner;
+      param.id.local = scope.next_local;
+      scope.next_local = scope.next_local + 1;
+
+      push_ident(ctx, func.header.parameters[i].ident, param.id);
+      i = i + 1;
+    }
+
+    resolve_body(ctx, unit_get_body(ctx.unit, item.node.function.body));
+    pop_scope(ctx);
+  }
+}
+
+fn resolve_variable(ctx: *ResolutionContext, item: *Item) {
+  val scope: *Scope = &ctx.scope_stack[ctx.stack_top];
+  if item.node.variable.body.local {
+    scope.current_owner = item.id.owner;
+    resolve_body(ctx, unit_get_body(ctx.unit, item.node.variable.body));
+  }
 }
 
 fn resolve_item(ctx: *ResolutionContext, item: *Item) {
-  //TODO
+  if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  resolve_variable(ctx, item);
+  if item.kind == ItemKind::Function  resolve_function(ctx, item);
 }
 
 fn resolve(sess: *Session, unit: *CompilationUnit) {
   var ctx: ResolutionContext;
 
-  ctx.scope_stack = malloc(sizeof(Scope) * 16);
+  ctx.interner = &sess.interner;
+  ctx.unit = unit;
+  ctx.scope_stack = malloc(sizeof(Scope) * 128);
   ctx.stack_top = 0;
   var i: u32 = 0;
-  while i < 16 {
+  while i < 128 {
     ctx.scope_stack[i].symbols = intmap_create(1024);
     i = i + 1;
   }
