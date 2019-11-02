@@ -1,0 +1,12 @@
+
+
+fn main() {
+  var x: u32 = 12;
+  var p: *u32 = &x;
+  printf("%u\n", x);
+  *p = 42;
+  printf("%u\n", x);
+  x = 14;
+  printf("%u\n", x);
+  printf("%u\n", *p);
+}

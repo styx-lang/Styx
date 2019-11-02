@@ -1,0 +1,33 @@
+
+fn main() {
+  var a: u32 = 1;
+  var b: u32 = 2;
+  var c: u32 = 3;
+
+  if a < b {
+    printf("A");
+  }
+
+  if a > b {
+    printf("B");
+  }
+
+  if c > a  printf("C");
+
+  if a == b {
+    printf("D");
+  }
+  else {
+    printf("E")
+  }
+
+  if a + b == c  printf("F");
+  else  printf("G");
+
+  if c == a  printf("H");
+  else if c == b  printf("I");
+  else if c == c  printf("J");
+  else printf("K");
+
+  printf("\n");
+}

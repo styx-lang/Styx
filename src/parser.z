@@ -174,7 +174,7 @@ fn parse_integer_literal(ctx: *ParsingContext) -> *Expr {
   expr.node.lit.kind = LiteralKind::Int;
 
   var sess: *Session = ctx.sess;
-  expr.node.lit.value.integer = atoi(get_str(&sess.interner, tok.lexeme));
+  expr.node.lit.value.integer = atol(get_str(&sess.interner, tok.lexeme));
   return expr;
 }
 

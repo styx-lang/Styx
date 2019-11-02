@@ -1,0 +1,13 @@
+
+fn main() {
+  var u: u32 = 42;
+  printf("%u\n", u);
+  var i: i32 = -12;
+  printf("%d\n", i);
+  var c: char = 'X';
+  printf("%c\n", c);
+  var s: *char = "Are you suggesting that coconuts migrate?";
+  printf("%s\n", s);
+  var l: u64 = 17179869184;
+  printf("%lu\n", l);
+}

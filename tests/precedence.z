@@ -1,0 +1,20 @@
+
+fn main() {
+  var x: u32 = 1 + 2 * 3;
+  printf("%u\n", x);
+
+  x = 5 * 7 - 3;
+  printf("%u\n", x);
+
+  x = 2 + 3 * 4 + 5;
+  printf("%u\n", x);
+
+  if 2 + 3 > 4  printf("T\n");
+  else  printf("F\n");
+
+  if false && false || true  printf("T\n");
+  else  printf("F\n");
+
+  if 2 + 3 > 12 || 2 + 3 << 3 > 30  printf("T\n");
+  else  printf("F\n");
+}
