@@ -39,7 +39,7 @@ fn source_map_new_file(self: *SourceMap, filename: *char) -> *SourceFile {
   return file;
 }
 
-fn source_snippet(m: *SourceMap, span: Span) {
+fn source_map_info(m: *SourceMap, span: Span, first: *u32, last: *u32) -> *SourceFile {
   var i: u32 = 0;
   var file: *SourceFile = 0;
   while i < m.num_files {
@@ -52,12 +52,10 @@ fn source_snippet(m: *SourceMap, span: Span) {
 
   if !file  abort();
 
-  var line_first: u32 = 0;
-  var line_last: u32 = 0;
   i = 0;
   while i < file.num_lines {
-    if file.lines[i] < span.from {
-      line_first = i;
+    if file.lines[i] <= span.from {
+      *first = i;
     }
     else  break;
     i = i + 1;
@@ -65,16 +63,35 @@ fn source_snippet(m: *SourceMap, span: Span) {
   i = i - 1;
   while i < file.num_lines {
     if file.lines[i] <= span.to {
-      line_last = i;
+      *last = i;
     }
     else  break;
     i = i + 1;
   }
 
+  return file;
+}
+
+fn emit_line_directive(fp: *FILE, m: *SourceMap, span: Span) {
+  var line_first: u32;
+  var line_end: u32;
+
+  var file: *SourceFile = source_map_info(m, span, &line_first, &line_end);
+
+  fprintf(fp, "#line %u \"%s\"\n", line_first + 1, file.name);
+}
+
+fn source_snippet(m: *SourceMap, span: Span) {
+
+  var line_first: u32;
+  var line_last: u32;
+
+  var file: *SourceFile = source_map_info(m, span, &line_first, &line_last);
+
   printf("%s:%u\n", file.name, line_first + 1);
 
   var buffer: *char = malloc(1024);
-  i = line_first;
+  var i: u32 = line_first;
   while i <= line_last {
     val line_start: u32 = file.lines[i];
     val line_end: u32 = file.lines[i + 1];

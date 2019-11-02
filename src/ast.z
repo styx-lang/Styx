@@ -156,6 +156,7 @@ union ExprKindNode {
 
 struct Expr {
   id: NodeId,
+  span: Span,
   kind: ExprKind,
   node: ExprKindNode,
 }
@@ -194,12 +195,14 @@ union StmtKindNode {
 struct Stmt {
   kind: StmtKind,
   node: StmtKindNode,
+  span: Span,
 }
 
 struct Block {
   stmts: **Stmt,
   num_stmts: u32,
   id: NodeId,
+  span: Span,
 }
 
 struct Body {
@@ -280,6 +283,7 @@ struct Item {
   kind: ItemKind,
   node: ItemKindNode,
   vis: Visibility,
+  span: Span,
 }
 
 struct CompilationUnit {

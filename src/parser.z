@@ -43,6 +43,14 @@ fn expect(ctx: *ParsingContext, kind: TokenKind) -> Token {
   }
 }
 
+fn span_start(ctx: *ParsingContext) -> u32 {
+  return ctx.tokens[ctx.current_token].span.from;
+}
+
+fn span_end(ctx: *ParsingContext) -> u32 {
+  return ctx.tokens[ctx.current_token - 1].span.to;
+}
+
 fn parse_identifier(ctx: *ParsingContext) -> Ident {
 
   var tok: Token = consume(ctx);
@@ -326,6 +334,7 @@ fn parse_block(ctx: *ParsingContext) -> *Block {
   var block : *Block = malloc(sizeof(Block));
   block.stmts = malloc(8 * 128);
   block.num_stmts = 0;
+  block.span.from = span_start(ctx);
 
   val next : Token = look_ahead(ctx, 0);
   if next.kind == TokenKind::LeftCurly {
@@ -340,6 +349,7 @@ fn parse_block(ctx: *ParsingContext) -> *Block {
     block.stmts[0] = parse_stmt(ctx);
     block.num_stmts = 1;
   }
+  block.span.to = span_end(ctx);
 
   return block;
 }
@@ -371,6 +381,8 @@ fn parse_if(ctx: *ParsingContext) -> *Expr {
 
 fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
   val tok: Token = look_ahead(ctx, 0);
+  var span: Span;
+  span.from = span_start(ctx);
 
   var left : *Expr;
 
@@ -395,6 +407,8 @@ fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
     val next_tok : Token = consume(ctx);
     left = parse_infix_operator(ctx, left, next_tok);
   }
+  span.to = span_end(ctx);
+  left.span = span;
 
   return left;
 }
@@ -404,6 +418,8 @@ fn parse_item(ctx: *ParsingContext) -> NodeId
 fn parse_stmt(ctx: *ParsingContext) -> *Stmt {
 
   var stmt: *Stmt = malloc(sizeof(Stmt));
+  stmt.span.from = span_start(ctx);
+
   val tok: Token = look_ahead(ctx, 0);
   if accept(ctx, TokenKind::Break) {
     stmt.kind = StmtKind::Break;
@@ -440,6 +456,7 @@ fn parse_stmt(ctx: *ParsingContext) -> *Stmt {
   }
 
   accept(ctx, TokenKind::Semicolon);
+  stmt.span.to = span_end(ctx);
 
   return stmt;
 }
@@ -563,6 +580,7 @@ fn parse_item(ctx: *ParsingContext) -> NodeId {
 
   var id: NodeId;
   var item: *Item = unit_create_item(&ctx.unit, &id);
+  item.span.from = span_start(ctx);
 
   if tok.kind == TokenKind::Fn  parse_function_decl(ctx, item);
   else if tok.kind == TokenKind::Struct || tok.kind == TokenKind::Union  parse_compound_decl(ctx, item);
@@ -572,6 +590,7 @@ fn parse_item(ctx: *ParsingContext) -> NodeId {
 
   accept(ctx, TokenKind::Semicolon);
 
+  item.span.to = span_end(ctx);
   return id;
 }
 

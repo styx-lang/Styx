@@ -4,6 +4,7 @@ struct CodegenContext {
   ident_is_ptr: *StrMap,
   sess: *Session,
   unit: *CompilationUnit,
+  source: *SourceMap,
 }
 
 fn generate_expr(ctx: *CodegenContext, expr: *Expr)
@@ -214,6 +215,7 @@ fn generate_while(ctx: *CodegenContext, data: *WhileData) {
 }
 
 fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt) {
+  emit_line_directive(ctx.out, ctx.source, stmt.span);
   if stmt.kind == StmtKind::Assignment generate_assignment(ctx, stmt.node.assignment);
   else if stmt.kind == StmtKind::Break  fprintf(ctx.out, "break;\n");
   else if stmt.kind == StmtKind::Continue  fprintf(ctx.out, "continue;\n");
@@ -236,6 +238,9 @@ fn generate_block(ctx: *CodegenContext, block: *Block) {
 }
 
 fn generate_variable(ctx: *CodegenContext, item: *Item) {
+
+  emit_line_directive(ctx.out, ctx.source, item.span);
+
   generate_type(ctx, item.node.variable.ty);
 
   var sess: *Session = ctx.sess;
@@ -251,6 +256,9 @@ fn generate_variable(ctx: *CodegenContext, item: *Item) {
 }
 
 fn generate_function(ctx: *CodegenContext, item: *Item) {
+
+  emit_line_directive(ctx.out, ctx.source, item.span);
+
   val func: FunctionData = item.node.function;
   val header: FunctionHeader = func.header;
   generate_type(ctx, header.output);
@@ -280,6 +288,7 @@ fn generate_enum(ctx: *CodegenContext, item: *Item) {
   var sess: *Session = ctx.sess;
   var enum_name: *char = get_str(&sess.interner, item.ident.name);
 
+  emit_line_directive(ctx.out, ctx.source, item.span);
   fprintf(ctx.out, "typedef enum %s {\n", enum_name);
   var i: u32 = 0;
 
@@ -306,6 +315,7 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
 
   fprintf(ctx.out, "typedef %s %s %s;\n", compound_kind, compound_name, compound_name);
 
+  emit_line_directive(ctx.out, ctx.source, item.span);
   if data.num_fields > 0 {
     fprintf(ctx.out, "typedef %s %s {\n", compound_kind, compound_name);
     var i: u32 = 0;
@@ -335,6 +345,7 @@ fn generate(sess: *Session, unit: CompilationUnit, output_file: *char) {
   ctx.out = fopen(output_file, "w");
   ctx.ident_is_ptr = strmap_create(1024);
   ctx.sess = sess;
+  ctx.source = &sess.source;
   ctx.unit = &unit;
 
   generate_prelude(&ctx);
