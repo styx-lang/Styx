@@ -15,7 +15,7 @@ enum TokenKind {
     Fn,
     For,
     If,
-    Module,
+    Mod,
     Return,
     Static,
     Struct,

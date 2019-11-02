@@ -351,8 +351,8 @@ fn generate(sess: *Session, unit: CompilationUnit, output_file: *char) {
   generate_prelude(&ctx);
 
   var i: u32 = 0;
-  while i < unit.num_root_items {
-    var item: *Item = unit_get_item(ctx.unit, unit.root_items[i]);
+  while i < unit.module.num_items {
+    var item: *Item = unit_get_item(ctx.unit, unit.module.items[i]);
     generate_item(&ctx, item);
     i = i + 1;
   }

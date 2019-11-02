@@ -31,6 +31,12 @@ struct Path {
   res: Res,
 }
 
+struct Mod {
+  span: Span,
+  items: *NodeId,
+  num_items: u32,
+}
+
 enum TypeKind {
   Unit,
   Ptr,
@@ -259,6 +265,7 @@ struct FunctionParameter {
   ty: *Type,
 }
 
+
 struct FunctionHeader {
   parameters: *FunctionParameter,
   num_parameters: u32,
@@ -280,6 +287,7 @@ enum ItemKind {
   Const,
   Enum,
   Function,
+  Mod,
   Struct,
   Union,
   Variable,
@@ -290,6 +298,7 @@ union ItemKindNode {
   _enum: EnumData,
   variable: VariableData,
   function: FunctionData,
+  module: Mod,
 }
 
 struct Item {
@@ -310,8 +319,7 @@ struct CompilationUnit {
   items: *Item,
   num_items: u32,
 
-  root_items: *NodeId,
-  num_root_items: u32,
+  module: Mod,
 }
 
 fn unit_create_body(unit: *CompilationUnit, owner_item: NodeId, id: *NodeId) -> *Body {

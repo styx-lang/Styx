@@ -214,15 +214,15 @@ fn resolve(sess: *Session, unit: *CompilationUnit) {
   }
 
   i = 0;
-  while i < unit.num_root_items {
-    var item: *Item = unit_get_item(unit, unit.root_items[i]);
+  while i < unit.module.num_items {
+    var item: *Item = unit_get_item(unit, unit.module.items[i]);
     scan_item(&ctx, item);
     i = i + 1;
   }
 
   i = 0;
-  while i < unit.num_root_items {
-    var item: *Item = unit_get_item(unit, unit.root_items[i]);
+  while i < unit.module.num_items {
+    var item: *Item = unit_get_item(unit, unit.module.items[i]);
     resolve_item(&ctx, item);
     i = i + 1;
   }

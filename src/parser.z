@@ -596,6 +596,13 @@ fn parse_item(ctx: *ParsingContext) -> NodeId {
   return id;
 }
 
+fn parse_mod_inner(ctx: *ParsingContext, module: *Mod) {
+  while !accept(ctx, TokenKind::RightCurly) && !is_done_parsing(ctx) {
+    module.items[module.num_items] = parse_item(ctx);
+    module.num_items = module.num_items + 1;
+  }
+}
+
 fn parse(sess: *Session, tokens: *Token, num_tokens: u32) -> CompilationUnit {
 
   val ctx: ParsingContext;
@@ -613,13 +620,13 @@ fn parse(sess: *Session, tokens: *Token, num_tokens: u32) -> CompilationUnit {
   ctx.unit.items = malloc(sizeof(Item) * 2048);
   ctx.unit.num_items = 1; //Reserve zero idx for null item
 
-  ctx.unit.root_items = malloc(sizeof(NodeId) * 2048);
-  ctx.unit.num_root_items = 0;
+  ctx.unit.module.items = malloc(sizeof(NodeId) * 2048);
+  ctx.unit.module.num_items = 0;
+  ctx.unit.module.span.from = span_start(&ctx);
 
-  while !is_done_parsing(&ctx) {
-    ctx.unit.root_items[ctx.unit.num_root_items] = parse_item(&ctx);
-    ctx.unit.num_root_items = ctx.unit.num_root_items + 1;
-  }
+  parse_mod_inner(&ctx, &ctx.unit.module);
+
+  ctx.unit.module.span.to = span_end(&ctx);
 
   return ctx.unit;
 }
