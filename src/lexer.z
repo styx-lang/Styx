@@ -245,7 +245,7 @@ fn lex(sess: *Session, source: *SourceFile, tokens: **Token, num_tokens: *u32) {
   ctx.source = source;
   ctx.start = 0;
   ctx.current = 0;
-  ctx.tokens = malloc(sizeof(Token) * 5000);
+  ctx.tokens = malloc(sizeof(Token) * 10000);
   ctx.current_token_idx = 0;
   ctx.sess = sess;
 
@@ -258,7 +258,7 @@ fn lex(sess: *Session, source: *SourceFile, tokens: **Token, num_tokens: *u32) {
 
   source.end = ctx.current;
 
-  if ctx.current_token_idx > 5000  {
+  if ctx.current_token_idx > 10000  {
     printf("Lexer token overflow: %u!\n", ctx.current_token_idx);
     abort();
   };
