@@ -1,0 +1,9 @@
+
+fn f<T>(T: t) -> T {
+  return t;
+}
+
+fn main() {
+  var a: u32 = 2;
+  printf("%u\n", f(a));
+}

@@ -22,6 +22,14 @@ fn accept(ctx: *ParsingContext, token: TokenKind) -> bool {
   return false;
 }
 
+fn can_accept(ctx: *ParsingContext, token: TokenKind) -> bool {
+  var tok : Token = ctx.tokens[ctx.current_token];
+  if !is_done_parsing(ctx) && tok.kind == token {
+    return true;
+  }
+  return false;
+}
+
 fn look_ahead(ctx: *ParsingContext, offset: u64) -> Token {
   if ctx.current_token == ctx.num_tokens {
     var eof_tok: Token;
@@ -471,6 +479,21 @@ fn parse_stmt(ctx: *ParsingContext) -> *Stmt {
   return stmt;
 }
 
+fn parse_generics(ctx: *ParsingContext) -> Generics {
+  expect(ctx, TokenKind::Less);
+  var generics: Generics;
+  generics.parameters = malloc(4 * sizeof(GenericParam));
+  generics.num_parameters = 0;
+
+  while !accept(ctx, TokenKind::Greater) {
+    generics.parameters[generics.num_parameters].ident = parse_identifier(ctx);
+
+    accept(ctx, TokenKind::Comma);
+    generics.num_parameters = generics.num_parameters + 1;
+  }
+  return generics;
+}
+
 fn parse_body(ctx: *ParsingContext, owner: NodeId) -> NodeId {
   var id: NodeId;
   var body: *Body = unit_create_body(&ctx.unit, owner, &id);
@@ -502,6 +525,9 @@ fn parse_compound_decl(ctx: *ParsingContext, item: *Item) {
   else abort();
 
   item.ident = parse_identifier(ctx);
+
+  if can_accept(ctx, TokenKind::Less)  item.node.compound.generics = parse_generics(ctx);
+  else  item.node.compound.generics.num_parameters = 0;
 
   expect(ctx, TokenKind::LeftCurly);
 
@@ -547,6 +573,9 @@ fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
 
   header.parameters = malloc(sizeof(FunctionParameter) * 16);
   header.num_parameters = 0;
+
+  if can_accept(ctx, TokenKind::Less)  header.generics = parse_generics(ctx);
+  else  header.generics.num_parameters = 0;
 
   expect(ctx, TokenKind::LeftParen);
 

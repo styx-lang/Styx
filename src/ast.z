@@ -43,6 +43,16 @@ enum TypeKind {
   Path,
 }
 
+struct GenericParam {
+  id: NodeId,
+  ident: Ident,
+}
+
+struct Generics {
+  parameters: *GenericParam,
+  num_parameters: u32,
+  span: Span,
+}
 
 union TypeKindNode {
   path: Sid,
@@ -247,6 +257,7 @@ struct CompoundField {
 struct CompoundData {
   fields: *CompoundField,
   num_fields: u32,
+  generics: Generics,
 }
 
 struct EnumVariant {
@@ -270,6 +281,7 @@ struct FunctionHeader {
   parameters: *FunctionParameter,
   num_parameters: u32,
   output: *Type,
+  generics: Generics,
 }
 
 struct FunctionData {
