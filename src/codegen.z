@@ -146,6 +146,13 @@ fn generate_conditional(ctx: *CodegenContext, cond: ConditionalData) {
   }
 }
 
+fn generate_while(ctx: *CodegenContext, data: WhileData) {
+  fprintf(ctx.out, "while ( ");
+  generate_expr(ctx, data.condition);
+  fprintf(ctx.out, ")\n");
+  generate_expr(ctx, data.body);
+}
+
 fn generate_indexing(ctx: *CodegenContext, idx: IndexingData) {
   generate_expr(ctx, idx.array);
   fprintf(ctx.out, "[");
@@ -187,6 +194,7 @@ fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
    else if expr.kind == ExprKind::Block  generate_block(ctx, expr.node.block);
    else if expr.kind == ExprKind::Call  generate_call(ctx, expr.node.call);
    else if expr.kind == ExprKind::Conditional  generate_conditional(ctx, expr.node.conditional);
+   else if expr.kind == ExprKind::While  generate_while(ctx, expr.node.whl);
    else if expr.kind == ExprKind::Indexing  generate_indexing(ctx, expr.node.indexing);
    else if expr.kind == ExprKind::Field  generate_field(ctx, expr.node.field);
    else if expr.kind == ExprKind::Literal  generate_literal(ctx, expr.node.lit);
@@ -207,13 +215,6 @@ fn generate_return(ctx: *CodegenContext, expr: *Expr) {
   fprintf(ctx.out, ";\n");
 }
 
-fn generate_while(ctx: *CodegenContext, data: *WhileData) {
-  fprintf(ctx.out, "while ( ");
-  generate_expr(ctx, data.condition);
-  fprintf(ctx.out, ")\n");
-  generate_expr(ctx, data.body);
-}
-
 fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt) {
   emit_line_directive(ctx.out, ctx.source, stmt.span);
   if stmt.kind == StmtKind::Assignment generate_assignment(ctx, stmt.node.assignment);
@@ -222,7 +223,6 @@ fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt) {
   else if stmt.kind == StmtKind::Expr { generate_expr(ctx, stmt.node.expr); fprintf(ctx.out, ";\n"); }
   else if stmt.kind == StmtKind::Item  generate_item(ctx, unit_get_item(ctx.unit, stmt.node.item));
   else if stmt.kind == StmtKind::Return  generate_return(ctx, stmt.node._return);
-  else if stmt.kind == StmtKind::While  generate_while(ctx, &stmt.node._while);
   else abort();
 }
 

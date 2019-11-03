@@ -381,6 +381,17 @@ fn parse_if(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
+fn parse_while(ctx: *ParsingContext) -> *Expr {
+  expect(ctx, TokenKind::While);
+
+  var expr: *Expr = malloc(sizeof(Expr));
+  expr.kind = ExprKind::While;
+  expr.node.whl.condition = parse_expression(ctx, 0);
+  expr.node.whl.body = parse_block_expr(ctx);
+
+  return expr;
+}
+
 fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
   val tok: Token = look_ahead(ctx, 0);
   var span: Span;
@@ -397,6 +408,7 @@ fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
   else if (tok.kind == TokenKind::Minus || tok.kind == TokenKind::Bang ||
            tok.kind == TokenKind::And || tok.kind == TokenKind::Star) left = parse_prefix_operator(ctx);
   else if tok.kind == TokenKind::If  left = parse_if(ctx);
+  else if tok.kind == TokenKind::While  left = parse_while(ctx);
   else if tok.kind == TokenKind::LeftParen {
     expect(ctx, TokenKind::LeftParen);
     left = parse_expression(ctx, 0);
@@ -433,10 +445,6 @@ fn parse_stmt(ctx: *ParsingContext) -> *Stmt {
   } else if accept(ctx, TokenKind::Defer) {
     stmt.kind = StmtKind::Defer;
     stmt.node._defer = parse_expression(ctx, 0);
-  } else if accept(ctx, TokenKind::While) {
-    stmt.kind = StmtKind::While;
-    stmt.node._while.condition = parse_expression(ctx, 0);
-    stmt.node._while.body = parse_block_expr(ctx);
   } else if accept(ctx, TokenKind::Semicolon) {
     stmt.kind = StmtKind::Empty;
   } else if (tok.kind == TokenKind::Var || tok.kind == TokenKind::Val) {

@@ -102,6 +102,11 @@ fn resolve_conditional(ctx: *ResolutionContext, cond: ConditionalData) {
   }
 }
 
+fn resolve_while(ctx: *ResolutionContext, data: WhileData) {
+  resolve_expr(ctx, data.condition);
+  resolve_expr(ctx, data.body);
+}
+
 fn resolve_indexing(ctx: *ResolutionContext, idx: IndexingData) {
   resolve_expr(ctx, idx.array);
   resolve_expr(ctx, idx.index);
@@ -117,6 +122,7 @@ fn resolve_expr(ctx: *ResolutionContext, expr: *Expr) {
   else if expr.kind == ExprKind::Block  resolve_block(ctx, expr.node.block);
   else if expr.kind == ExprKind::Call  resolve_call(ctx, expr.node.call);
   else if expr.kind == ExprKind::Conditional  resolve_conditional(ctx, expr.node.conditional);
+  else if expr.kind == ExprKind::While  resolve_while(ctx, expr.node.whl);
   else if expr.kind == ExprKind::Indexing  resolve_indexing(ctx, expr.node.indexing);
   else if expr.kind == ExprKind::Field  resolve_field(ctx, expr.node.field);
   else if expr.kind == ExprKind::Path  resolve_path(ctx, &expr.node.path);
@@ -127,17 +133,11 @@ fn resolve_assignment(ctx: *ResolutionContext, assignment: AssignmentData) {
   resolve_expr(ctx, assignment.right);
 }
 
-fn resolve_while(ctx: *ResolutionContext, data: WhileData) {
-  resolve_expr(ctx, data.condition);
-  resolve_expr(ctx, data.body);
-}
-
 fn resolve_stmt(ctx: *ResolutionContext, stmt: *Stmt) {
   if stmt.kind == StmtKind::Assignment resolve_assignment(ctx, stmt.node.assignment);
   else if stmt.kind == StmtKind::Expr resolve_expr(ctx, stmt.node.expr);
   else if stmt.kind == StmtKind::Item  resolve_item(ctx, unit_get_item(ctx.unit, stmt.node.item));
   else if stmt.kind == StmtKind::Return  resolve_expr(ctx, stmt.node._return);
-  else if stmt.kind == StmtKind::While  resolve_while(ctx, stmt.node._while);
 }
 
 fn resolve_block(ctx: *ResolutionContext, block: *Block) {
