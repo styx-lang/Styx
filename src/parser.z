@@ -4,7 +4,7 @@ struct ParsingContext {
   num_tokens: u64,
   source_map: *SourceMap,
   sess: *Session,
-  unit: CompilationUnit,
+  unit: *CompilationUnit,
   next_owner: u32,
   current_owner: u32,
 }
@@ -496,7 +496,7 @@ fn parse_generics(ctx: *ParsingContext) -> Generics {
 
 fn parse_body(ctx: *ParsingContext, owner: NodeId) -> NodeId {
   var id: NodeId;
-  var body: *Body = unit_create_body(&ctx.unit, owner, &id);
+  var body: *Body = unit_create_body(ctx.unit, owner, &id);
 
   body.value = parse_expression(ctx, 0);
 
@@ -639,7 +639,7 @@ fn parse_item(ctx: *ParsingContext) -> NodeId {
   val tok : Token = look_ahead(ctx, 0);
 
   var id: NodeId;
-  var item: *Item = unit_create_item(&ctx.unit, &id);
+  var item: *Item = unit_create_item(ctx.unit, &id);
   item.span.from = span_start(ctx);
 
   if tok.kind == TokenKind::Fn  parse_function_decl(ctx, item);
@@ -657,6 +657,7 @@ fn parse_item(ctx: *ParsingContext) -> NodeId {
 }
 
 fn parse_mod_inner(ctx: *ParsingContext, module: *Mod) {
+  module.span.from = span_start(ctx);
   module.items = malloc(sizeof(NodeId) * 2048);
   module.num_items = 0;
 
@@ -664,9 +665,18 @@ fn parse_mod_inner(ctx: *ParsingContext, module: *Mod) {
     module.items[module.num_items] = parse_item(ctx);
     module.num_items = module.num_items + 1;
   }
+
+  module.span.to = span_end(ctx);
 }
 
-fn parse(sess: *Session, tokens: *Token, num_tokens: u32) -> CompilationUnit {
+fn parse_mod_external(sess: *Session, unit: *CompilationUnit, path: *char) -> Mod {
+
+  var source_file: *SourceFile = source_map_new_file(&sess.source, path);
+  load_file_content(source_file);
+
+  var tokens: *Token;
+  var num_tokens: u32;
+  lex(sess, source_file, &tokens, &num_tokens);
 
   val ctx: ParsingContext;
   ctx.current_token = 0;
@@ -674,20 +684,28 @@ fn parse(sess: *Session, tokens: *Token, num_tokens: u32) -> CompilationUnit {
   ctx.num_tokens = num_tokens;
   ctx.source_map = &sess.source;
   ctx.sess = sess;
+  ctx.unit = unit;
 
-  ctx.unit.body_map = intmap_create(2048);
-  ctx.unit.bodies = malloc(sizeof(Body) * 2048);
-  ctx.unit.num_bodies = 1; //Reserve zero idx for null body
+  var module: Mod;
 
-  ctx.unit.item_map = intmap_create(2048);
-  ctx.unit.items = malloc(sizeof(Item) * 2048);
-  ctx.unit.num_items = 1; //Reserve zero idx for null item
+  parse_mod_inner(&ctx, &module);
 
-  ctx.unit.module.span.from = span_start(&ctx);
+  return module;
+}
 
-  parse_mod_inner(&ctx, &ctx.unit.module);
+fn parse(sess: *Session, root_path: *char) -> CompilationUnit {
 
-  ctx.unit.module.span.to = span_end(&ctx);
+  var unit: CompilationUnit;
 
-  return ctx.unit;
+  unit.body_map = intmap_create(2048);
+  unit.bodies = malloc(sizeof(Body) * 2048);
+  unit.num_bodies = 1; //Reserve zero idx for null body
+
+  unit.item_map = intmap_create(2048);
+  unit.items = malloc(sizeof(Item) * 2048);
+  unit.num_items = 1; //Reserve zero idx for null item
+
+  unit.module = parse_mod_external(sess, &unit, root_path);
+
+  return unit;
 }

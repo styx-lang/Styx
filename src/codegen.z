@@ -330,12 +330,22 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
   }
 }
 
+fn generate_mod(ctx: *CodegenContext, module: *Mod) {
+  var i: u32 = 0;
+  while i < module.num_items {
+    var item: *Item = unit_get_item(ctx.unit, module.items[i]);
+    generate_item(ctx, item);
+    i = i + 1;
+  }
+}
+
 fn generate_item(ctx: *CodegenContext, item: *Item) {
 
   if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  generate_variable(ctx, item);
   else if item.kind == ItemKind::Enum   generate_enum(ctx, item);
   else if item.kind == ItemKind::Function   generate_function(ctx, item);
   else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  generate_compound(ctx, item);
+  else if item.kind == ItemKind::Mod  generate_mod(ctx, &item.node.module);
   fprintf(ctx.out, "\n");
 }
 
@@ -350,10 +360,5 @@ fn generate(sess: *Session, unit: CompilationUnit, output_file: *char) {
 
   generate_prelude(&ctx);
 
-  var i: u32 = 0;
-  while i < unit.module.num_items {
-    var item: *Item = unit_get_item(ctx.unit, unit.module.items[i]);
-    generate_item(&ctx, item);
-    i = i + 1;
-  }
+  generate_mod(&ctx, &unit.module);
 }

@@ -1,0 +1,116 @@
+struct Span {
+  from: u32,
+  to: u32,
+}
+
+struct SourceFile {
+  name: *char,
+  content: *char,
+  length: u32,
+  start: u32,
+  end: u32,
+  lines: *u32,
+  num_lines: u32,
+}
+
+struct SourceMap {
+  files: *SourceFile,
+  num_files: u32,
+  file_starts: *u32,
+}
+
+fn source_map_create() -> SourceMap {
+  var map: SourceMap;
+  map.files = calloc(8, 1);
+  map.num_files = 0;
+  map.file_starts = calloc(sizeof(u32), 1);
+
+  return map;
+}
+
+fn source_map_new_file(self: *SourceMap, filename: *char) -> *SourceFile {
+  var file: *SourceFile = &self.files[self.num_files];
+  self.num_files = self.num_files + 1;
+
+  file.name = filename;
+  file.lines = calloc(sizeof(u32), 4096);
+  file.num_lines = 1;
+  return file;
+}
+
+fn source_map_info(m: *SourceMap, span: Span, first: *u32, last: *u32) -> *SourceFile {
+  var i: u32 = 0;
+  var file: *SourceFile = 0;
+  while i < m.num_files {
+    if m.file_starts[i] >= span.from {
+      file = &m.files[i];
+      break;
+    }
+    i = i + 1;
+  }
+
+  if !file  abort();
+
+  i = 0;
+  while i < file.num_lines {
+    if file.lines[i] <= span.from {
+      *first = i;
+    }
+    else  break;
+    i = i + 1;
+  }
+  i = i - 1;
+  while i < file.num_lines {
+    if file.lines[i] <= span.to {
+      *last = i;
+    }
+    else  break;
+    i = i + 1;
+  }
+
+  return file;
+}
+
+fn emit_line_directive(fp: *FILE, m: *SourceMap, span: Span) {
+  var line_first: u32;
+  var line_end: u32;
+
+  var file: *SourceFile = source_map_info(m, span, &line_first, &line_end);
+
+  fprintf(fp, "#line %u \"%s\"\n", line_first + 1, file.name);
+}
+
+fn source_snippet(m: *SourceMap, span: Span) {
+
+  var line_first: u32;
+  var line_last: u32;
+
+  var file: *SourceFile = source_map_info(m, span, &line_first, &line_last);
+
+  printf("%s:%u\n", file.name, line_first + 1);
+
+  var buffer: *char = malloc(1024);
+  var i: u32 = line_first;
+  while i <= line_last {
+    val line_start: u32 = file.lines[i];
+    val line_end: u32 = file.lines[i + 1];
+    var length: u32 = line_end - line_start;
+
+    memcpy(buffer, &file.content[line_start], length);
+    buffer[length+1] = 0;
+    printf("%s\n", buffer);
+    i = i + 1;
+  }
+
+}
+
+
+fn load_file_content(file: *SourceFile) {
+  var fp: *FILE = fopen(file.name, "rb");
+  fseek(fp, 0, SEEK_END);
+  file.length = ftell(fp);
+  rewind(fp);
+  file.content = malloc(file.length);
+  fread(file.content, 1, file.length, fp);
+  fclose(fp);
+}

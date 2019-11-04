@@ -1,16 +1,5 @@
 
 
-fn load_file_content(file: *SourceFile) {
-  var fp: *FILE = fopen(file.name, "rb");
-  fseek(fp, 0, SEEK_END);
-  file.length = ftell(fp);
-  rewind(fp);
-  file.content = malloc(file.length);
-  fread(file.content, 1, file.length, fp);
-  fclose(fp);
-}
-
-
 fn main(argc: int, argv: **char) -> int {
   if argc != 3 {
     printf("Usage: compiler INPUT OUTPUT\n");
@@ -22,14 +11,7 @@ fn main(argc: int, argv: **char) -> int {
   sess.interner = interner_create();
   sess.source = source_map_create();
 
-  var source_file: *SourceFile = source_map_new_file(&sess.source, argv[1]);
-  load_file_content(source_file);
-
-  var tokens: *Token;
-  var num_tokens: u32;
-  lex(&sess, source_file, &tokens, &num_tokens);
-
-  val unit: CompilationUnit = parse(&sess, tokens, num_tokens);
+  val unit: CompilationUnit = parse(&sess, argv[1]);
 
   resolve(&sess, &unit);
 

@@ -1,5 +1,6 @@
 #include "intmap.c"
 #include "strmap.c"
+#include "source_map.c"
 #include "error.c"
 #include "interning.c"
 #include "session.c"
