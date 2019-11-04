@@ -614,6 +614,27 @@ fn parse_function_decl(ctx: *ParsingContext, item: *Item) {
   else  item.node.function.body.owner = null;
 }
 
+fn parse_use(ctx: *ParsingContext, item: *Item) {
+  expect(ctx, TokenKind::Use);
+
+  item.kind = ItemKind::Use;
+  item.node._use.path = parse_path(ctx);
+
+  accept(ctx, TokenKind::Semicolon);
+}
+
+fn parse_mod_inner(ctx: *ParsingContext, module: *Mod)
+
+fn parse_mod(ctx: *ParsingContext, item: *Item) {
+  expect(ctx, TokenKind::Mod);
+
+  item.ident = parse_identifier(ctx);
+  item.kind = ItemKind::Mod;
+
+  if accept(ctx, TokenKind::LeftCurly)  parse_mod_inner(ctx, &item.node.module);
+}
+
+
 fn parse_item(ctx: *ParsingContext) -> NodeId {
   val tok : Token = look_ahead(ctx, 0);
 
@@ -625,6 +646,8 @@ fn parse_item(ctx: *ParsingContext) -> NodeId {
   else if tok.kind == TokenKind::Struct || tok.kind == TokenKind::Union  parse_compound_decl(ctx, item);
   else if tok.kind == TokenKind::Enum  parse_enum_decl(ctx, item);
   else if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  parse_variable_decl(ctx, item);
+  else if tok.kind == TokenKind::Use  parse_use(ctx, item);
+  else if tok.kind == TokenKind::Mod  parse_mod(ctx, item);
   else  emit_error(ctx.source_map, tok.span, "Unexpected token on top-level");
 
   accept(ctx, TokenKind::Semicolon);
@@ -634,6 +657,9 @@ fn parse_item(ctx: *ParsingContext) -> NodeId {
 }
 
 fn parse_mod_inner(ctx: *ParsingContext, module: *Mod) {
+  module.items = malloc(sizeof(NodeId) * 2048);
+  module.num_items = 0;
+
   while !accept(ctx, TokenKind::RightCurly) && !is_done_parsing(ctx) {
     module.items[module.num_items] = parse_item(ctx);
     module.num_items = module.num_items + 1;
@@ -657,8 +683,6 @@ fn parse(sess: *Session, tokens: *Token, num_tokens: u32) -> CompilationUnit {
   ctx.unit.items = malloc(sizeof(Item) * 2048);
   ctx.unit.num_items = 1; //Reserve zero idx for null item
 
-  ctx.unit.module.items = malloc(sizeof(NodeId) * 2048);
-  ctx.unit.module.num_items = 0;
   ctx.unit.module.span.from = span_start(&ctx);
 
   parse_mod_inner(&ctx, &ctx.unit.module);

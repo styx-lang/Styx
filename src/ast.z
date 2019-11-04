@@ -289,6 +289,10 @@ struct FunctionData {
   body: NodeId,
 }
 
+struct UseData {
+  path: Path,
+}
+
 struct VariableData {
   ty: *Type,
   mutable: bool,
@@ -302,6 +306,7 @@ enum ItemKind {
   Mod,
   Struct,
   Union,
+  Use,
   Variable,
 }
 
@@ -311,6 +316,7 @@ union ItemKindNode {
   variable: VariableData,
   function: FunctionData,
   module: Mod,
+  _use: UseData,
 }
 
 struct Item {

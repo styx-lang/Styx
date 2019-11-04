@@ -1,0 +1,12 @@
+mod mod_a {
+  fn A() {
+    return 1;
+  }
+}
+
+mod mod_b;
+mod mod_c;
+
+fn main() {
+  mod_a::A();
+}
