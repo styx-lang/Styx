@@ -1,3 +1,17 @@
+
+mod intmap;
+mod strmap;
+mod source_map;
+mod error;
+mod interning;
+mod session;
+mod tokens;
+mod lexer;
+mod ast;
+mod parser;
+mod resolution;
+mod codegen;
+
 fn basename(path: *char) -> *char
 fn dirname(path: *char) -> *char
 
