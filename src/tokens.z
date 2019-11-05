@@ -57,6 +57,7 @@ enum TokenKind {
     ColonColon,
     Semicolon,
     Arrow,
+    Ellipsis,
     //Literals
     Integer,
     Float,

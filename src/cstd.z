@@ -1,0 +1,25 @@
+
+fn malloc(size: u64) -> *void
+fn calloc(size: u64, count: u64) -> *void
+fn free(ptr: *void)
+
+fn memset(dest: *void, ch: i32, size: u64) -> *void
+fn memcpy(dest: *void, src: *constvoid, size: u64) -> *void
+fn strcmp(lhs: *constchar, rhs: *constchar) -> i32
+fn strlen(str: *constchar) -> u64
+
+fn atof(str: *constchar) -> f64
+fn atol(str: *constchar) -> i64
+
+fn abort();
+fn exit(status: i32);
+
+fn fopen(filename: *constchar, mode: *constchar) -> *FILE
+fn fclose(stream: *FILE) -> i32
+fn fseek(stream: *FILE, offset: i64, origin: i32) -> i32;
+fn rewind(stream: *FILE);
+fn ftell(stream: *FILE) -> i64;
+
+fn printf(format: *constchar, args: ...) -> i32
+fn fprintf(stream: *FILE, format: *constchar, args: ...) -> i32
+fn sprintf(buffer: *char, format: *constchar, args: ...) -> i32

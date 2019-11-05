@@ -103,6 +103,8 @@ fn parse_type(ctx: *ParsingContext) -> *Type {
   } else if token.kind == TokenKind::Star {
     kind = TypeKind::Ptr;
     node.ptr = parse_type(ctx);
+  } else if token.kind == TokenKind::Ellipsis {
+    kind = TypeKind::Variadic;
   }
   else  emit_error(ctx.source_map, token.span, "Expected type");
 

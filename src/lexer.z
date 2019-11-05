@@ -200,7 +200,6 @@ fn scan_token(ctx: *LexingContext) {
   else if c == '%' add_simple_token(ctx, TokenKind::Percent);
   else if c == '^' add_simple_token(ctx, TokenKind::Hat);
   else if c == ';' add_simple_token(ctx, TokenKind::Semicolon);
-  else if c == '.' add_simple_token(ctx, TokenKind::Dot);
   else if c == ',' add_simple_token(ctx, TokenKind::Comma);
   else if c == '-' add_lookahead_conditional_token(ctx, '>', TokenKind::Arrow, TokenKind::Minus);
   else if c == ':' add_lookahead_conditional_token(ctx, ':', TokenKind::ColonColon, TokenKind::Colon);
@@ -208,6 +207,13 @@ fn scan_token(ctx: *LexingContext) {
   else if c == '!' add_lookahead_conditional_token(ctx, '=', TokenKind::BangEqual, TokenKind::Bang);
   else if c == '&' add_lookahead_conditional_token(ctx, '&', TokenKind::AndAnd, TokenKind::And);
   else if c == '|' add_lookahead_conditional_token(ctx, '|', TokenKind::OrOr, TokenKind::Or);
+  else if c == '.' {
+    if peek_token(ctx, 0) == '.' && peek_token(ctx, 1) == '.' {
+      advance(ctx); advance(ctx);
+      add_simple_token(ctx, TokenKind::Ellipsis);
+    }
+    else  add_simple_token(ctx, TokenKind::Dot);
+  }
   else if c == '<' {
      val n1: char = peek_token(ctx, 0);
      if n1 == '<' {advance(ctx); add_simple_token(ctx, TokenKind::LessLess);}

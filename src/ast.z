@@ -41,6 +41,7 @@ enum TypeKind {
   Unit,
   Ptr,
   Path,
+  Variadic,
 }
 
 struct GenericParam {

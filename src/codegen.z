@@ -33,6 +33,8 @@ fn generate_prelude(ctx: *CodegenContext) {
   fprintf(ctx.out,"typedef int64_t i64;\n");
   fprintf(ctx.out,"typedef float f32;\n");
   fprintf(ctx.out,"typedef double f64;\n");
+  fprintf(ctx.out,"typedef const char constchar;\n");
+  fprintf(ctx.out,"typedef const void constvoid;\n");
   fprintf(ctx.out,"#define null 0ul\n");
 }
 
@@ -270,7 +272,13 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 
   var i: u32 = 0;
   while i < header.num_parameters {
-    generate_type(ctx, header.parameters[i].ty);
+    var ty: *Type = header.parameters[i].ty;
+    if ty.kind == TypeKind::Variadic {
+      fprintf(ctx.out, "...");
+      break;
+    }
+
+    generate_type(ctx, ty);
 
     var param_name: *char = get_str(&sess.interner, header.parameters[i].ident.name);
     strmap_insert(ctx.ident_is_ptr, param_name, type_is_ptr(header.parameters[i].ty));
