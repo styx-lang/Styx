@@ -2,6 +2,7 @@ struct LexingContext {
   start: u32,
   current: u32,
   line: u32,
+  file_span_offset: u32,
   source: *SourceFile,
   tokens: *Token,
   current_token_idx: u32,
@@ -42,8 +43,8 @@ fn add_token(ctx: *LexingContext, kind: TokenKind, lexeme: Sid) {
   var token: Token;
   token.kind = kind;
   token.lexeme = lexeme;
-  token.span.from = ctx.start;
-  token.span.to = ctx.current;
+  token.span.from = ctx.start + ctx.file_span_offset;
+  token.span.to = ctx.current + ctx.file_span_offset;
   ctx.tokens[ctx.current_token_idx] = token;
   ctx.current_token_idx = ctx.current_token_idx + 1;
 }
@@ -68,9 +69,7 @@ fn add_lookahead_conditional_token(ctx: *LexingContext, expect: char, first: Tok
 }
 
 fn read_newline(ctx: *LexingContext) {
-  var source: *SourceFile = ctx.source;
-  source.lines[source.num_lines] = ctx.start+1;
-  source.num_lines = source.num_lines + 1;
+  source_file_newline(ctx.source, ctx.start);
 }
 
 fn get_lexeme(ctx: *LexingContext, start_offset: u32, end_offset: u32) -> Sid {
@@ -244,6 +243,7 @@ fn lex(sess: *Session, source: *SourceFile, tokens: **Token, num_tokens: *u32) {
 
   var ctx: *LexingContext = malloc(sizeof(LexingContext));
   ctx.source = source;
+  ctx.file_span_offset = source.start;
   ctx.start = 0;
   ctx.current = 0;
   ctx.tokens = malloc(sizeof(Token) * 10000);
@@ -257,7 +257,7 @@ fn lex(sess: *Session, source: *SourceFile, tokens: **Token, num_tokens: *u32) {
     scan_token(ctx);
   }
 
-  source.end = ctx.current;
+  source_file_done(source, ctx.current);
 
   if ctx.current_token_idx > 10000  {
     printf("Lexer token overflow: %u!\n", ctx.current_token_idx);

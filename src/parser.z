@@ -623,7 +623,8 @@ fn parse_use(ctx: *ParsingContext, item: *Item) {
   accept(ctx, TokenKind::Semicolon);
 }
 
-fn parse_mod_inner(ctx: *ParsingContext, module: *Mod)
+fn parse_mod_inner(ctx: *ParsingContext) -> Mod
+fn parse_mod_external(sess: *Session, unit: *CompilationUnit, path: *char) -> Mod
 
 fn parse_mod(ctx: *ParsingContext, item: *Item) {
   expect(ctx, TokenKind::Mod);
@@ -631,7 +632,12 @@ fn parse_mod(ctx: *ParsingContext, item: *Item) {
   item.ident = parse_identifier(ctx);
   item.kind = ItemKind::Mod;
 
-  if accept(ctx, TokenKind::LeftCurly)  parse_mod_inner(ctx, &item.node.module);
+  if accept(ctx, TokenKind::LeftCurly)  item.node.module = parse_mod_inner(ctx);
+  else {
+    var sess: *Session = ctx.sess;
+    var path: *char = get_str(&sess.interner, item.ident.name);
+    item.node.module = parse_mod_external(ctx.sess, ctx.unit, path);
+  }
 }
 
 
@@ -656,7 +662,8 @@ fn parse_item(ctx: *ParsingContext) -> NodeId {
   return id;
 }
 
-fn parse_mod_inner(ctx: *ParsingContext, module: *Mod) {
+fn parse_mod_inner(ctx: *ParsingContext) -> Mod {
+  var module: Mod;
   module.span.from = span_start(ctx);
   module.items = malloc(sizeof(NodeId) * 2048);
   module.num_items = 0;
@@ -667,12 +674,13 @@ fn parse_mod_inner(ctx: *ParsingContext, module: *Mod) {
   }
 
   module.span.to = span_end(ctx);
+
+  return module;
 }
 
 fn parse_mod_external(sess: *Session, unit: *CompilationUnit, path: *char) -> Mod {
 
-  var source_file: *SourceFile = source_map_new_file(&sess.source, path);
-  load_file_content(source_file);
+  var source_file: *SourceFile = source_map_new_file(&sess.source, sess.root_path, path);
 
   var tokens: *Token;
   var num_tokens: u32;
@@ -686,14 +694,12 @@ fn parse_mod_external(sess: *Session, unit: *CompilationUnit, path: *char) -> Mo
   ctx.sess = sess;
   ctx.unit = unit;
 
-  var module: Mod;
-
-  parse_mod_inner(&ctx, &module);
+  var module: Mod = parse_mod_inner(&ctx);
 
   return module;
 }
 
-fn parse(sess: *Session, root_path: *char) -> CompilationUnit {
+fn parse(sess: *Session, root_module_name: *char) -> CompilationUnit {
 
   var unit: CompilationUnit;
 
@@ -705,7 +711,7 @@ fn parse(sess: *Session, root_path: *char) -> CompilationUnit {
   unit.items = malloc(sizeof(Item) * 2048);
   unit.num_items = 1; //Reserve zero idx for null item
 
-  unit.module = parse_mod_external(sess, &unit, root_path);
+  unit.module = parse_mod_external(sess, &unit, root_module_name);
 
   return unit;
 }

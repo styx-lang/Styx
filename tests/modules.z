@@ -1,12 +1,15 @@
-mod mod_a {
+mod module_a {
   fn A() {
-    return 1;
+    printf("A\n");
   }
 }
 
-mod mod_b;
-mod mod_c;
+mod module_b;
+mod module_c;
 
 fn main() {
-  mod_a::A();
+  A();
+  B();
+  C();
+  C_A();
 }

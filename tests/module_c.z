@@ -1,0 +1,6 @@
+
+mod module_c_a;
+
+fn C() {
+  printf("C\n");
+}

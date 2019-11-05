@@ -3,4 +3,5 @@
 struct Session {
   interner: Interner,
   source: SourceMap,
+  root_path: *char,
 }

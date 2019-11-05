@@ -1,0 +1,4 @@
+
+fn C_A() {
+  printf("C_A\n");
+}

@@ -1,4 +1,5 @@
-
+fn basename(path: *char) -> *char
+fn dirname(path: *char) -> *char
 
 fn main(argc: int, argv: **char) -> int {
   if argc != 3 {
@@ -8,10 +9,13 @@ fn main(argc: int, argv: **char) -> int {
 
   var sess: Session;
 
+
   sess.interner = interner_create();
   sess.source = source_map_create();
+  var root_module: *char = basename(argv[1]);
+  sess.root_path = dirname(argv[1]);
 
-  val unit: CompilationUnit = parse(&sess, argv[1]);
+  val unit: CompilationUnit = parse(&sess, root_module);
 
   resolve(&sess, &unit);
 
