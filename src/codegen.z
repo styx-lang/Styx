@@ -20,9 +20,6 @@ fn generate_prelude(ctx: *CodegenContext) {
   fprintf(ctx.out,"//Prelude\n");
   fprintf(ctx.out,"#include <stdint.h>\n");
   fprintf(ctx.out,"#include <stdbool.h>\n");
-  fprintf(ctx.out,"#include <stdio.h>\n");
-  fprintf(ctx.out,"#include <stdlib.h>\n");
-  fprintf(ctx.out,"#include <string.h>\n");
   fprintf(ctx.out,"typedef uint8_t u8;\n");
   fprintf(ctx.out,"typedef uint16_t u16;\n");
   fprintf(ctx.out,"typedef uint32_t u32;\n");
@@ -35,7 +32,6 @@ fn generate_prelude(ctx: *CodegenContext) {
   fprintf(ctx.out,"typedef double f64;\n");
   fprintf(ctx.out,"typedef const char constchar;\n");
   fprintf(ctx.out,"typedef const void constvoid;\n");
-  fprintf(ctx.out,"#define null 0ul\n");
 }
 
 fn generate_sid(ctx: *CodegenContext, sid: Sid) {

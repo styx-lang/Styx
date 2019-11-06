@@ -17,7 +17,7 @@ fn strmap_create(size: u64) -> *StrMap {
   var i: u32 = 0;
   while i < size {
     map.keys[i] = 0;
-    map.values[i] = null;
+    map.values[i] = 0;
     i = i + 1;
   }
 
@@ -32,7 +32,7 @@ fn strmap_hash(s: *char) -> u32 {
     s = s + 1;
     c = *s;
   }
-  if hash != null  return hash;
+  if hash != 0  return hash;
   else return 1;
 }
 
@@ -43,10 +43,10 @@ fn strmap_insert(map: *StrMap, key: *char, value: u32) {
     exit(-1);
   }
   while true {
-    if map.keys[h] != null && !strcmp(map.keys[h], key) {
+    if map.keys[h] != 0 && !strcmp(map.keys[h], key) {
       map.values[h] = value;
       break;
-    } else if map.keys[h] == null {
+    } else if map.keys[h] == 0 {
       map.keys[h] = key;
       map.values[h] = value;
       map.load = map.load + 1;
@@ -60,7 +60,7 @@ fn strmap_insert(map: *StrMap, key: *char, value: u32) {
 fn strmap_lookup(map: *StrMap, key: *char) -> u32 {
   var h: u32 = strmap_hash(key) % map.size;
   while (true) {
-    if map.keys[h] == null  return null;
+    if map.keys[h] == 0  return 0;
     if !strcmp(map.keys[h],key) {
       return map.values[h];
     }

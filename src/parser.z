@@ -517,7 +517,7 @@ fn parse_variable_decl(ctx: *ParsingContext, item: *Item) {
   item.node.variable.ty = parse_type(ctx);
 
   if accept(ctx, TokenKind::Equal)  item.node.variable.body = parse_body(ctx, item.id);
-  else  item.node.variable.body.owner = null;
+  else  item.node.variable.body.owner = 0;
 }
 
 fn parse_compound_decl(ctx: *ParsingContext, item: *Item) {
@@ -613,7 +613,7 @@ fn parse_function_decl(ctx: *ParsingContext, item: *Item) {
   item.node.function.header = parse_function_header(ctx);
 
   if look_ahead(ctx, 0).kind == TokenKind::LeftCurly  item.node.function.body = parse_body(ctx, item.id);
-  else  item.node.function.body.owner = null;
+  else  item.node.function.body.owner = 0;
 }
 
 fn parse_use(ctx: *ParsingContext, item: *Item) {
