@@ -75,12 +75,15 @@ fn parse_path(ctx: *ParsingContext) -> Path {
   var path: Path;
   path.segments = malloc(8 * 4);
   path.num_segments = 0;
+  path.span.from = span_start(ctx);
 
   while true {
     path.segments[path.num_segments] = parse_identifier(ctx);
     path.num_segments = path.num_segments + 1;
     if !accept(ctx, TokenKind::ColonColon)  break;
   }
+
+  path.span.to = span_end(ctx);
   return path;
 }
 
@@ -568,6 +571,7 @@ fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
     expect(ctx, TokenKind::Colon);
     val type: *Type = parse_type(ctx);
     header.parameters[header.num_parameters].ty = type;
+    header.parameters[header.num_parameters].id = ast_create_node_id(ctx.ast, ctx.current_def);
     header.num_parameters = header.num_parameters + 1;
 
     accept(ctx, TokenKind::Comma);

@@ -65,6 +65,7 @@ fn resolve_path(ctx: *ResolutionContext, path: *Path) {
   }
   else {
     printf("Failed to resolve %s\n", get_str(ctx.interner, path.segments[0].name));
+    source_snippet(ctx.source_map, path.span);
   }
 }
 
@@ -219,6 +220,7 @@ fn resolve(sess: *Session, ast: *Ast) {
   ctx.ast = ast;
   ctx.scope_stack = malloc(sizeof(Scope) * 128);
   ctx.stack_top = 0;
+  ctx.source_map = &sess.source;
   var i: u32 = 0;
   while i < 128 {
     ctx.scope_stack[i].symbols = intmap_create(1024);

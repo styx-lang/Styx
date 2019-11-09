@@ -29,6 +29,7 @@ struct Path {
   segments: *Ident,
   num_segments: u32,
   res: Res,
+  span: Span,
 }
 
 struct Mod {
