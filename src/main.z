@@ -10,7 +10,9 @@ mod tokens;
 mod lexer;
 mod ast;
 mod parser;
+mod types;
 mod resolution;
+mod typecheck;
 mod codegen;
 
 fn basename(path: *char) -> *char

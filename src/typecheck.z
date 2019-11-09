@@ -1,0 +1,197 @@
+struct TypeContext {
+  ast: *Ast,
+  interner: *Interner,
+  source_map: *SourceMap,
+}
+
+fn create_void_type(ctx: *TypeContext) -> *Ty {
+
+}
+
+fn create_fn_type(ctx: *TypeContext, header: FunctionHeader) -> *Ty {
+
+}
+
+fn type_of_node(ctx: *TypeContext, node: NodeId) -> *Ty {
+
+}
+
+fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty;
+fn check_block(ctx: *TypeContext, block: *Block);
+fn check_stmt(ctx: *TypeContext, stmt: *Stmt);
+fn check_item(ctx: *TypeContext, item: *Item);
+fn check_mod(ctx: *TypeContext, module: *Mod);
+
+fn ast_type_to_ty(ctx: *TypeContext, ast_ty: *Type) -> *Ty {
+
+}
+
+fn check_unary(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  var inner: *Ty = check_expr(ctx, expr.node.unary.inner);
+  return inner;
+}
+
+fn check_binary(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  var left: *Ty = check_expr(ctx, expr.node.binary.left);
+  var right: *Ty = check_expr(ctx, expr.node.binary.right);
+  if left != right  emit_error(ctx.source_map, expr.span, "Arguments of binary op must be compatible");
+
+  return left;
+}
+
+fn check_block_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  return create_void_type(ctx);
+}
+
+fn check_call(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  var call: CallData = expr.node.call;
+  val fn_ty: *Ty = check_expr(ctx, call.func);
+  if fn_ty.kind != TyKind::Fn  emit_error(ctx.source_map, expr.span, "Tried to call non-function");
+
+  val fn_def: *FnDef = &fn_ty.node.function;
+
+  var i: i32 = 0;
+  while i < call.num_args {
+    val arg_ty: *Ty = check_expr(ctx, call.args[i]);
+    if arg_ty != fn_def.parameters[i]  emit_error(ctx.source_map, expr.span, "Function parameter type mismatch");
+    i = i + 1;
+  }
+  return fn_def.output;
+}
+
+fn check_conditional(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  var data: ConditionalData = expr.node.conditional;
+  var condition: *Expr = data.condition;
+  val cond_ty: *Ty = check_expr(ctx, condition);
+  if cond_ty.kind != TyKind::Bool  emit_error(ctx.source_map, condition.span, "Condition must be of type bool");
+
+  check_expr(ctx, data.then);
+  if data.otherwise {
+     check_expr(ctx, data.otherwise);
+  }
+  return create_void_type(ctx);
+}
+
+fn check_while(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  var data: WhileData = expr.node.whl;
+  var condition: *Expr = data.condition;
+  val cond_ty: *Ty = check_expr(ctx, condition);
+  if cond_ty.kind != TyKind::Bool  emit_error(ctx.source_map, condition.span, "Condition must be of type bool");
+  check_expr(ctx, data.body);
+  return create_void_type(ctx);
+}
+
+fn check_indexing(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  val data: IndexingData = expr.node.indexing;
+  val array_ty: *Ty = check_expr(ctx, data.array);
+  if array_ty.kind != TyKind::Ptr   emit_error(ctx.source_map, expr.span, "Cannot index into non-ptr type");
+  val index_ty: *Ty = check_expr(ctx, data.index);
+  if !(index_ty.kind == TyKind::Signed || index_ty.kind == TyKind::Unsigned) {
+     emit_error(ctx.source_map, expr.span, "Cannot index into non-ptr type");
+  }
+  return array_ty.node.ptr;
+}
+
+fn check_field(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  val data: FieldData = expr.node.field;
+  var compound_ty: *Ty = check_expr(ctx, data.strct);
+
+  var ptr_inner: *Ty = compound_ty.node.ptr;
+  if compound_ty.kind == TyKind::Ptr && ptr_inner.kind == TyKind::Compound  compound_ty = compound_ty.node.ptr;
+
+  if compound_ty.kind != TyKind::Compound   emit_error(ctx.source_map, expr.span, "Cannot access field of non-compound type");
+
+  val compound: CompoundDef = compound_ty.node.compound;
+
+  var i: u32 = 0;
+  while i < compound.num_fields {
+    if compound.fields[i].ident.name.x == data.ident.name.x {
+      return compound.fields[i].ty;
+    }
+  }
+  emit_error(ctx.source_map, expr.span, "Compound type has no such field");
+  return null;
+}
+
+fn check_path(ctx: *TypeContext, path: *Path) -> *Ty {
+  return type_of_node(ctx, path.res.node.def);
+}
+
+fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  if expr.kind == ExprKind::Unary  return check_unary(ctx, expr);
+  else if expr.kind == ExprKind::Binary  return check_binary(ctx, expr);
+  else if expr.kind == ExprKind::Block  return check_block_expr(ctx, expr);
+  else if expr.kind == ExprKind::Call  return check_call(ctx, expr);
+  else if expr.kind == ExprKind::Conditional  return check_conditional(ctx, expr);
+  else if expr.kind == ExprKind::While  return check_while(ctx, expr);
+  else if expr.kind == ExprKind::Indexing  return check_indexing(ctx, expr);
+  else if expr.kind == ExprKind::Field  return check_field(ctx, expr);
+  else if expr.kind == ExprKind::Path  return check_path(ctx, &expr.node.path);
+  else abort();
+}
+
+fn check_assignment(ctx: *TypeContext, assignment: AssignmentData) {
+  check_expr(ctx, assignment.left);
+  check_expr(ctx, assignment.right);
+}
+
+fn check_return(ctx: *TypeContext, expr: *Expr) {
+  check_expr(ctx, expr);
+}
+
+fn check_stmt(ctx: *TypeContext, stmt: *Stmt) {
+  if stmt.kind == StmtKind::Assignment  check_assignment(ctx, stmt.node.assignment);
+  else if stmt.kind == StmtKind::Break  {}
+  else if stmt.kind == StmtKind::Continue  {}
+  else if stmt.kind == StmtKind::Expr  check_expr(ctx, stmt.node.expr);
+  else if stmt.kind == StmtKind::Item  check_item(ctx, ast_get_item(ctx.ast, stmt.node.item));
+  else if stmt.kind == StmtKind::Return  check_return(ctx, stmt.node._return);
+  else abort();
+}
+
+fn check_variable(ctx: *TypeContext, item: *Item) {
+  var decl_ty: *Ty = ast_type_to_ty(ctx, item.node.variable.ty);
+
+  var body: *Body = ast_get_body(ctx.ast, item.node.variable.body);
+  if body > 0 {
+    var expr_ty: *Ty = check_expr(ctx, body.value);
+    if decl_ty != expr_ty  emit_error(ctx.source_map, item.span, "Variable type declaration does not match expression type");
+  }
+}
+
+fn check_function(ctx: *TypeContext, item: *Item) {
+
+  var fn_ty: *Ty = create_fn_type(ctx, item.node.function.header);
+
+  var body: *Body = ast_get_body(ctx.ast, item.node.variable.body);
+  if body > 0 {
+    check_expr(ctx, body.value);
+  }
+}
+
+fn check_item(ctx: *TypeContext, item: *Item) {
+  if item.kind == ItemKind::Enum  {}
+  else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  {}
+  else if item.kind == ItemKind::Mod  check_mod(ctx, &item.node.module);
+  else if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  check_variable(ctx, item);
+  else if item.kind == ItemKind::Function  check_function(ctx, item);
+}
+
+fn check_mod(ctx: *TypeContext, module: *Mod) {
+  var i: u32 = 0;
+  while i < module.num_items {
+    var item: *Item = ast_get_item(ctx.ast, module.items[i]);
+    check_item(ctx, item);
+    i = i + 1;
+  }
+}
+
+fn check(sess: *Session, ast: *Ast) {
+  var ctx: TypeContext;
+
+  ctx.interner = &sess.interner;
+  ctx.source_map = &sess.source;
+  ctx.ast = ast;
+
+  check_mod(&ctx, &ast.root_module);
+}

@@ -13,11 +13,52 @@ enum FloatingSize {
   Float_Unspecified,
 }
 
-enum PrimitiveTypeKind {
-  Void,
+struct Ty {};
+
+struct FieldDef {
+  ident: Ident,
+  ty: *Ty,
+}
+
+struct CompoundDef {
+  fields: *FieldDef,
+  num_fields: u32,
+}
+
+struct EnumDef {
+  variants: *Ident,
+  num_variants: u32,
+}
+
+struct FnDef {
+  parameters: **Ty,
+  num_parameters: u32,
+  output: *Ty,
+}
+
+enum TyKind {
+  Bool,
+  Char,
   Signed,
   Unsigned,
   Floating,
-  Char,
-  Str,
+  Ptr,
+  Fn,
+  Enum,
+  Compound,
+  Void,
+}
+
+union TyKindNode {
+  integer: IntegerSize,
+  floating: FloatingSize,
+  ptr: *Ty,
+  compound: CompoundDef,
+  _enum: EnumDef,
+  function: FnDef,
+}
+
+struct Ty {
+  kind: TyKind,
+  node: TyKindNode,
 }
