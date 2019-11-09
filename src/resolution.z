@@ -1,27 +1,26 @@
 
 struct Scope {
   symbols: *IntMap,
-  current_owner: u32,
   next_local: u32,
 }
 
 struct ResolutionContext {
   scope_stack: *Scope,
   stack_top: u32,
-  unit: *CompilationUnit,
+  ast: *Ast,
   source_map: *SourceMap,
   interner: *Interner,
 }
 
 fn encode_id(id: NodeId) -> u64 {
-  var owner: u64 = id.owner;
-  var v: u64 = (owner << 32) | id.local;
+  var def: u64 = id.def;
+  var v: u64 = (def << 32) | id.local;
   return v;
 }
 
 fn decode_id(v: u64) -> NodeId {
   var id: NodeId;
-  id.owner = v >> 32;
+  id.def = v >> 32;
   id.local = v;
   return id;
 }
@@ -46,7 +45,6 @@ fn lookup_ident(ctx: *ResolutionContext, ident: Ident, id: *NodeId) -> bool {
 
 fn push_scope(ctx: *ResolutionContext) {
   ctx.stack_top = ctx.stack_top + 1;
-  ctx.scope_stack[ctx.stack_top].current_owner = ctx.scope_stack[ctx.stack_top - 1].current_owner;
   ctx.scope_stack[ctx.stack_top].next_local = 2;
 }
 
@@ -136,7 +134,7 @@ fn resolve_assignment(ctx: *ResolutionContext, assignment: AssignmentData) {
 fn resolve_stmt(ctx: *ResolutionContext, stmt: *Stmt) {
   if stmt.kind == StmtKind::Assignment resolve_assignment(ctx, stmt.node.assignment);
   else if stmt.kind == StmtKind::Expr resolve_expr(ctx, stmt.node.expr);
-  else if stmt.kind == StmtKind::Item  resolve_item(ctx, unit_get_item(ctx.unit, stmt.node.item));
+  else if stmt.kind == StmtKind::Item  resolve_item(ctx, ast_get_item(ctx.ast, stmt.node.item));
   else if stmt.kind == StmtKind::Return  resolve_expr(ctx, stmt.node._return);
 }
 
@@ -147,7 +145,7 @@ fn resolve_block(ctx: *ResolutionContext, block: *Block) {
   while i < block.num_stmts {
     var stmt: *Stmt = block.stmts[i];
     if stmt.kind == StmtKind::Item {
-      var item: *Item = unit_get_item(ctx.unit, stmt.node.item);
+      var item: *Item = ast_get_item(ctx.ast, stmt.node.item);
       push_ident(ctx, item.ident, stmt.node.item);
     }
     i = i + 1;
@@ -161,7 +159,7 @@ fn resolve_block(ctx: *ResolutionContext, block: *Block) {
   pop_scope(ctx);
 }
 
-fn resolve_body(ctx: *ResolutionContext, body: Body) {
+fn resolve_body(ctx: *ResolutionContext, body: *Body) {
   resolve_expr(ctx, body.value);
 }
 
@@ -169,29 +167,24 @@ fn resolve_function(ctx: *ResolutionContext, item: *Item) {
   val scope: *Scope = &ctx.scope_stack[ctx.stack_top];
   var func: FunctionData = item.node.function;
   if func.body.local {
-    scope.current_owner = item.id.owner;
     push_scope(ctx);
     var i: u32 = 0;
     while i < func.header.num_parameters {
       var param: *FunctionParameter = &func.header.parameters[i];
-      param.id.owner = scope.current_owner;
-      param.id.local = scope.next_local;
       scope.next_local = scope.next_local + 1;
 
       push_ident(ctx, func.header.parameters[i].ident, param.id);
       i = i + 1;
     }
 
-    resolve_body(ctx, unit_get_body(ctx.unit, item.node.function.body));
+    resolve_body(ctx, ast_get_body(ctx.ast, item.node.function.body));
     pop_scope(ctx);
   }
 }
 
 fn resolve_variable(ctx: *ResolutionContext, item: *Item) {
-  val scope: *Scope = &ctx.scope_stack[ctx.stack_top];
   if item.node.variable.body.local {
-    scope.current_owner = item.id.owner;
-    resolve_body(ctx, unit_get_body(ctx.unit, item.node.variable.body));
+    resolve_body(ctx, ast_get_body(ctx.ast, item.node.variable.body));
   }
 }
 
@@ -206,24 +199,24 @@ fn resolve_item(ctx: *ResolutionContext, item: *Item) {
 fn resolve_mod(ctx: *ResolutionContext, module: *Mod) {
   var i: u32 = 0;
   while i < module.num_items {
-    var item: *Item = unit_get_item(ctx.unit, module.items[i]);
+    var item: *Item = ast_get_item(ctx.ast, module.items[i]);
     scan_item(ctx, item);
     i = i + 1;
   }
 
   i = 0;
   while i < module.num_items {
-    var item: *Item = unit_get_item(ctx.unit, module.items[i]);
+    var item: *Item = ast_get_item(ctx.ast, module.items[i]);
     resolve_item(ctx, item);
     i = i + 1;
   }
 }
 
-fn resolve(sess: *Session, unit: *CompilationUnit) {
+fn resolve(sess: *Session, ast: *Ast) {
   var ctx: ResolutionContext;
 
   ctx.interner = &sess.interner;
-  ctx.unit = unit;
+  ctx.ast = ast;
   ctx.scope_stack = malloc(sizeof(Scope) * 128);
   ctx.stack_top = 0;
   var i: u32 = 0;
@@ -232,5 +225,5 @@ fn resolve(sess: *Session, unit: *CompilationUnit) {
     i = i + 1;
   }
 
-  resolve_mod(&ctx, &unit.module);
+  resolve_mod(&ctx, &ast.root_module);
 }

@@ -3,7 +3,7 @@ struct CodegenContext {
   out: *FILE,
   ident_is_ptr: *StrMap,
   sess: *Session,
-  unit: *CompilationUnit,
+  ast: *Ast,
   source: *SourceMap,
 }
 
@@ -76,7 +76,7 @@ fn generate_literal(ctx: *CodegenContext, lit: Literal) {
   else abort();
 }
 
-fn generate_body(ctx: *CodegenContext, body: Body) {
+fn generate_body(ctx: *CodegenContext, body: *Body) {
   generate_expr(ctx, body.value);
 }
 
@@ -219,7 +219,7 @@ fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt) {
   else if stmt.kind == StmtKind::Break  fprintf(ctx.out, "break;\n");
   else if stmt.kind == StmtKind::Continue  fprintf(ctx.out, "continue;\n");
   else if stmt.kind == StmtKind::Expr { generate_expr(ctx, stmt.node.expr); fprintf(ctx.out, ";\n"); }
-  else if stmt.kind == StmtKind::Item  generate_item(ctx, unit_get_item(ctx.unit, stmt.node.item));
+  else if stmt.kind == StmtKind::Item  generate_item(ctx, ast_get_item(ctx.ast, stmt.node.item));
   else if stmt.kind == StmtKind::Return  generate_return(ctx, stmt.node._return);
   else abort();
 }
@@ -248,7 +248,7 @@ fn generate_variable(ctx: *CodegenContext, item: *Item) {
   fprintf(ctx.out, " %s ", var_name);
   if item.node.variable.body.local {
     fprintf(ctx.out, "= ");
-    generate_body(ctx, unit_get_body(ctx.unit, item.node.variable.body));
+    generate_body(ctx, ast_get_body(ctx.ast, item.node.variable.body));
   }
   fprintf(ctx.out, ";\n");
 }
@@ -283,7 +283,7 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
     i = i + 1;
   }
   fprintf(ctx.out, ") ");
-  if func.body.local  generate_body(ctx, unit_get_body(ctx.unit, func.body));
+  if func.body.local  generate_body(ctx, ast_get_body(ctx.ast, func.body));
   else  fprintf(ctx.out, ";\n");
 }
 
@@ -337,7 +337,7 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
 fn generate_mod(ctx: *CodegenContext, module: *Mod) {
   var i: u32 = 0;
   while i < module.num_items {
-    var item: *Item = unit_get_item(ctx.unit, module.items[i]);
+    var item: *Item = ast_get_item(ctx.ast, module.items[i]);
     generate_item(ctx, item);
     i = i + 1;
   }
@@ -353,16 +353,16 @@ fn generate_item(ctx: *CodegenContext, item: *Item) {
   fprintf(ctx.out, "\n");
 }
 
-fn generate(sess: *Session, unit: CompilationUnit, output_file: *char) {
+fn generate(sess: *Session, ast: Ast, output_file: *char) {
   var ctx: CodegenContext;
 
   ctx.out = fopen(output_file, "w");
   ctx.ident_is_ptr = strmap_create(1024);
   ctx.sess = sess;
   ctx.source = &sess.source;
-  ctx.unit = &unit;
+  ctx.ast = &ast;
 
   generate_prelude(&ctx);
 
-  generate_mod(&ctx, &unit.module);
+  generate_mod(&ctx, &ast.root_module);
 }

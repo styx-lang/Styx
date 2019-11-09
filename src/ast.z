@@ -4,7 +4,7 @@ struct Expr {}
 struct Block {}
 
 struct NodeId {
-  owner: u32,
+  def: u32,
   local: u32,
 }
 
@@ -227,6 +227,7 @@ struct Stmt {
   kind: StmtKind,
   node: StmtKindNode,
   span: Span,
+  id: NodeId,
 }
 
 struct Block {
@@ -329,63 +330,77 @@ struct Item {
   span: Span,
 }
 
-struct CompilationUnit {
+struct Ast {
   body_map: *IntMap,
   bodies: *Body,
   num_bodies: u32,
 
-  item_map: *IntMap,
   items: *Item,
   num_items: u32,
 
-  module: Mod,
+  next_local: *u32,
+
+  root_module: Mod,
 }
 
-fn unit_create_body(unit: *CompilationUnit, owner_item: NodeId, id: *NodeId) -> *Body {
-
-  val idx: u32 = unit.num_bodies;
-  var body: *Body = &unit.bodies[idx];
-  unit.num_bodies = unit.num_bodies + 1;
-
-  val owner: u64 = owner_item.owner;
-  val local: u64 = 1;
-  val key: u64 = (owner << 32) | local;
-  intmap_insert(unit.body_map, key, idx);
-
-  id.owner = owner;
-  id.local = local;
-
-  return body;
+fn ast_create_node_id(ast: *Ast, def: NodeId) -> NodeId {
+  val id: NodeId;
+  id.def = def.def;
+  ast.next_local[def.def] = ast.next_local[def.def] + 1;
+  id.local = ast.next_local[def.def];
+  return id;
 }
 
-fn unit_get_body(unit: *CompilationUnit, id: NodeId) -> Body {
-  val owner: u64 = id.owner;
-  val key: u64 = (owner << 32) | (id.local);
-  val idx: u32 = intmap_lookup(unit.body_map, key);
-  return unit.bodies[idx];
+fn ast_create_expr(ast: *Ast, def: NodeId, kind: ExprKind) -> *Expr {
+  var expr: *Expr = malloc(sizeof(Expr));
+  expr.kind = kind;
+  expr.id = ast_create_node_id(ast, def);
+
+  return expr;
 }
 
-fn unit_create_item(unit: *CompilationUnit, id: *NodeId) -> *Item {
+fn ast_create_stmt(ast: *Ast, def: NodeId) -> *Stmt {
+  var stmt: *Stmt = malloc(sizeof(Stmt));
+  stmt.id = ast_create_node_id(ast, def);
 
-  val idx: u32 = unit.num_items;
-  var item: *Item = &unit.items[idx];
-  unit.num_items = unit.num_items + 1;
+  return stmt;
+}
 
-  val owner: u64 = idx;
-  val local: u64 = 0;
-  val key: u64 = (owner << 32) | local;
-  intmap_insert(unit.item_map, key, idx);
+fn ast_create_body(ast: *Ast, expr: *Expr) -> NodeId {
 
-  id.owner = owner;
-  id.local = local;
-  item.id = *id;
+  val idx: u32 = ast.num_bodies;
+  var body: *Body = &ast.bodies[idx];
+  ast.num_bodies = ast.num_bodies + 1;
+
+  body.value = expr;
+
+  val def: u64 = expr.id.def;
+  val local: u64 = expr.id.local;
+  val key: u64 = (def << 32) | local;
+  intmap_insert(ast.body_map, key, idx);
+
+  return expr.id;
+}
+
+fn ast_get_body(ast: *Ast, id: NodeId) -> *Body {
+  val def: u64 = id.def;
+  val key: u64 = (def << 32) | (id.local);
+  val idx: u32 = intmap_lookup(ast.body_map, key);
+  return &ast.bodies[idx];
+}
+
+fn ast_create_item(ast: *Ast) -> *Item {
+
+  val idx: u32 = ast.num_items;
+  var item: *Item = &ast.items[idx];
+  ast.num_items = ast.num_items + 1;
+
+  item.id.def = idx;
+  item.id.local = 0;
 
   return item;
 }
 
-fn unit_get_item(unit: *CompilationUnit, id: NodeId) -> *Item {
-  val owner: u64 = id.owner;
-  val key: u64 = (owner << 32) | (id.local);
-  val idx: u32 = intmap_lookup(unit.item_map, key);
-  return &unit.items[idx];
+fn ast_get_item(ast: *Ast, id: NodeId) -> *Item {
+  return &ast.items[id.def];
 }

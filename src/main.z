@@ -30,11 +30,10 @@ fn main(argc: int, argv: **char) -> int {
   var root_module: *char = basename(argv[1]);
   sess.root_path = dirname(argv[1]);
 
-  val unit: CompilationUnit = parse(&sess, root_module);
+  val ast: Ast = parse(&sess, root_module);
 
-  resolve(&sess, &unit);
-
-  generate(&sess, unit, argv[2]);
+  resolve(&sess, &ast);
+  generate(&sess, ast, argv[2]);
 
   return 0;
 }
