@@ -21,11 +21,13 @@ struct FieldDef {
 }
 
 struct CompoundDef {
+  def_id: u32,
   fields: *FieldDef,
   num_fields: u32,
 }
 
 struct EnumDef {
+  def_id: u32,
   variants: *Ident,
   num_variants: u32,
 }

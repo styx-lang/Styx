@@ -1,19 +1,142 @@
+
+struct CommonTypes {
+  _void: *Ty,
+  _bool: *Ty,
+  _char: *Ty,
+  _i8: *Ty,
+  _i16: *Ty,
+  _i32: *Ty,
+  _i64: *Ty,
+  _u8: *Ty,
+  _u16: *Ty,
+  _u32: *Ty,
+  _u64: *Ty,
+  _f32: *Ty,
+  _f64: *Ty,
+}
+
 struct TypeContext {
   ast: *Ast,
   interner: *Interner,
   source_map: *SourceMap,
+  common: CommonTypes,
+  types_lookup: *IntMap,
+  types: *Ty,
+  next_type_idx: u32,
+  ident_type_lookup: *IntMap,
+  node_type_lookup: *IntMap,
 }
 
-fn create_void_type(ctx: *TypeContext) -> *Ty {
+fn hash_ty(ty: *Ty) -> u64;
 
+fn hash_fn(ty: *Ty) -> u64 {
+
+  var def: FnDef = ty.node.function;
+  var h: u64 = hash_ty(def.output);
+
+  var i: u32 = 0;
+  while i < def.num_parameters {
+    h = h ^ (hash_ty(def.parameters[i]) + 2654435769 + (h << 6) + (h >> 2));
+    i = i + 1;
+  }
+  return h;
 }
 
-fn create_fn_type(ctx: *TypeContext, header: FunctionHeader) -> *Ty {
+fn hash_ty(ty: *Ty) -> u64 {
 
+  var h: u64;
+
+  h = ty.kind;
+
+  if ty.kind == TyKind::Signed || ty.kind == TyKind::Unsigned  h = h ^ (ty.node.integer << 4);
+  else if ty.kind == TyKind::Floating  h = h ^ (ty.node.floating << 4);
+  else if ty.kind == TyKind::Compound  h = h ^ (ty.node.compound.def_id << 4);
+  else if ty.kind == TyKind::Enum  h = h ^ (ty.node._enum.def_id << 4);
+  else if ty.kind == TyKind::Fn  h = h ^ (hash_fn(ty) << 4);
+  else if ty.kind == TyKind::Ptr  h = h ^ (hash_ty(ty.node.ptr) << 4);
+
+  return h;
+}
+
+fn intern_ty(ctx: *TypeContext, ty: Ty) -> *Ty {
+  val h: u64 = hash_ty(&ty);
+  var ty_idx: u32 = intmap_lookup(ctx.types_lookup, h);
+  if ty_idx == 0 {
+    ty_idx = ctx.next_type_idx;
+    ctx.next_type_idx = ctx.next_type_idx + 1;
+    intmap_insert(ctx.types_lookup, h, ty_idx);
+  }
+  return &ctx.types[ty_idx];
+}
+
+fn create_base_type(ctx: *TypeContext, kind: TyKind) -> *Ty {
+  val ty: Ty;
+  ty.kind = kind;
+  return intern_ty(ctx, ty);
+}
+
+fn create_float_type(ctx: *TypeContext, size: FloatingSize) -> *Ty {
+  val ty: Ty;
+  ty.kind = TyKind::Floating;
+  ty.node.floating = size;
+  return intern_ty(ctx, ty);
+}
+
+fn create_int_type(ctx: *TypeContext, kind: TyKind, size: IntegerSize) -> *Ty {
+  val ty: Ty;
+  ty.kind = kind;
+  ty.node.integer = size;
+  return intern_ty(ctx, ty);
+}
+
+fn create_common_types(ctx: *TypeContext) {
+  val t: *CommonTypes = &ctx.common;
+  t._void = create_base_type(ctx, TyKind::Void);
+  t._bool = create_base_type(ctx, TyKind::Bool);
+  t._char = create_base_type(ctx, TyKind::Char);
+
+  t._i8 = create_int_type(ctx, TyKind::Signed, IntegerSize::I8);
+  t._i16 = create_int_type(ctx, TyKind::Signed, IntegerSize::I16);
+  t._i32 = create_int_type(ctx, TyKind::Signed, IntegerSize::I32);
+  t._i64 = create_int_type(ctx, TyKind::Signed, IntegerSize::I64);
+
+  t._u8 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I8);
+  t._u16 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I16);
+  t._u32 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I32);
+  t._u64 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I64);
+
+  t._f32 = create_float_type(ctx, FloatingSize::F32);
+  t._f64 = create_float_type(ctx, FloatingSize::F64);
+}
+
+fn ast_type_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty;
+
+fn ast_path_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
+  val ty_idx: u32 = intmap_lookup(ctx.ident_type_lookup, ast_ty.node.path.x);
+  if ty_idx == 0  abort();
+  return &ctx.types[ty_idx];
+}
+
+fn ast_ptr_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
+  val ty: Ty;
+  ty.kind = TyKind::Ptr;
+  ty.node.ptr = ast_type_to_ty(ctx, ast_ty.node.ptr);
+  return intern_ty(ctx, ty);
+}
+
+fn ast_type_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
+  if ast_ty.kind == AstTypeKind::Void  return ctx.common._void;
+  else if ast_ty.kind == AstTypeKind::Path  return ast_path_to_ty(ctx, ast_ty);
+  else if ast_ty.kind == AstTypeKind::Ptr  return ast_ptr_to_ty(ctx, ast_ty);
+  else abort();
 }
 
 fn type_of_node(ctx: *TypeContext, node: NodeId) -> *Ty {
-
+  var def: u64 = node.def;
+  var k: u64 = (def << 32) | node.local;
+  val ty_idx: u32 = intmap_lookup(ctx.ident_type_lookup, k);
+  if ty_idx == 0  abort();
+  return &ctx.types[ty_idx];
 }
 
 fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty;
@@ -21,10 +144,6 @@ fn check_block(ctx: *TypeContext, block: *Block);
 fn check_stmt(ctx: *TypeContext, stmt: *Stmt);
 fn check_item(ctx: *TypeContext, item: *Item);
 fn check_mod(ctx: *TypeContext, module: *Mod);
-
-fn ast_type_to_ty(ctx: *TypeContext, ast_ty: *Type) -> *Ty {
-
-}
 
 fn check_unary(ctx: *TypeContext, expr: *Expr) -> *Ty {
   var inner: *Ty = check_expr(ctx, expr.node.unary.inner);
@@ -40,7 +159,7 @@ fn check_binary(ctx: *TypeContext, expr: *Expr) -> *Ty {
 }
 
 fn check_block_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
-  return create_void_type(ctx);
+  return ctx.common._void;
 }
 
 fn check_call(ctx: *TypeContext, expr: *Expr) -> *Ty {
@@ -69,7 +188,7 @@ fn check_conditional(ctx: *TypeContext, expr: *Expr) -> *Ty {
   if data.otherwise {
      check_expr(ctx, data.otherwise);
   }
-  return create_void_type(ctx);
+  return ctx.common._void;
 }
 
 fn check_while(ctx: *TypeContext, expr: *Expr) -> *Ty {
@@ -78,7 +197,7 @@ fn check_while(ctx: *TypeContext, expr: *Expr) -> *Ty {
   val cond_ty: *Ty = check_expr(ctx, condition);
   if cond_ty.kind != TyKind::Bool  emit_error(ctx.source_map, condition.span, "Condition must be of type bool");
   check_expr(ctx, data.body);
-  return create_void_type(ctx);
+  return ctx.common._void;
 }
 
 fn check_indexing(ctx: *TypeContext, expr: *Expr) -> *Ty {
@@ -160,8 +279,6 @@ fn check_variable(ctx: *TypeContext, item: *Item) {
 }
 
 fn check_function(ctx: *TypeContext, item: *Item) {
-
-  var fn_ty: *Ty = create_fn_type(ctx, item.node.function.header);
 
   var body: *Body = ast_get_body(ctx.ast, item.node.variable.body);
   if body > 0 {

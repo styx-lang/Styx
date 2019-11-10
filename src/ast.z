@@ -1,5 +1,5 @@
 
-struct Type {}
+struct AstType {}
 struct Expr {}
 struct Block {}
 
@@ -38,8 +38,8 @@ struct Mod {
   num_items: u32,
 }
 
-enum TypeKind {
-  Unit,
+enum AstTypeKind {
+  Void,
   Ptr,
   Path,
   Variadic,
@@ -56,15 +56,15 @@ struct Generics {
   span: Span,
 }
 
-union TypeKindNode {
+union AstTypeKindNode {
   path: Sid,
-  ptr: *Type,
+  ptr: *AstType,
 }
 
-struct Type {
+struct AstType {
   id: NodeId,
-  kind: TypeKind,
-  node: TypeKindNode,
+  kind: AstTypeKind,
+  node: AstTypeKindNode,
 }
 
 enum LiteralKind {
@@ -254,7 +254,7 @@ struct Visibility {
 struct CompoundField {
   ident: Ident,
   id: NodeId,
-  ty: *Type,
+  ty: *AstType,
 }
 
 struct CompoundData {
@@ -276,14 +276,14 @@ struct EnumData {
 struct FunctionParameter {
   ident: Ident,
   id: NodeId,
-  ty: *Type,
+  ty: *AstType,
 }
 
 
 struct FunctionHeader {
   parameters: *FunctionParameter,
   num_parameters: u32,
-  output: *Type,
+  output: *AstType,
   generics: Generics,
 }
 
@@ -297,7 +297,7 @@ struct UseData {
 }
 
 struct VariableData {
-  ty: *Type,
+  ty: *AstType,
   mutable: bool,
   body: NodeId,
 }

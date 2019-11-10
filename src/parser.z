@@ -93,23 +93,23 @@ fn parse_path_expr(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_type(ctx: *ParsingContext) -> *Type {
-  var node: TypeKindNode;
-  var kind: TypeKind;
+fn parse_type(ctx: *ParsingContext) -> *AstType {
+  var node: AstTypeKindNode;
+  var kind: AstTypeKind;
 
   val token: Token = consume(ctx);
   if token.kind == TokenKind::Identifier {
-    kind = TypeKind::Path;
+    kind = AstTypeKind::Path;
     node.path = token.lexeme; //parse_path(ctx, token);
   } else if token.kind == TokenKind::Star {
-    kind = TypeKind::Ptr;
+    kind = AstTypeKind::Ptr;
     node.ptr = parse_type(ctx);
   } else if token.kind == TokenKind::Ellipsis {
-    kind = TypeKind::Variadic;
+    kind = AstTypeKind::Variadic;
   }
   else  emit_error(ctx.source_map, token.span, "Expected type");
 
-  var type: *Type = malloc(sizeof(Type));
+  var type: *AstType = malloc(sizeof(AstType));
   type.kind = kind;
   type.node = node;
 
@@ -526,7 +526,7 @@ fn parse_compound_decl(ctx: *ParsingContext, item: *Item) {
     item.node.compound.fields[item.node.compound.num_fields].ident.name = token.lexeme;
     expect(ctx, TokenKind::Colon);
 
-    val type: *Type = parse_type(ctx);
+    val type: *AstType = parse_type(ctx);
     item.node.compound.fields[item.node.compound.num_fields].ty = type;
     item.node.compound.num_fields = item.node.compound.num_fields + 1;
     expect(ctx, TokenKind::Comma);
@@ -569,7 +569,7 @@ fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
     header.parameters[header.num_parameters].ident = parse_identifier(ctx);
 
     expect(ctx, TokenKind::Colon);
-    val type: *Type = parse_type(ctx);
+    val type: *AstType = parse_type(ctx);
     header.parameters[header.num_parameters].ty = type;
     header.parameters[header.num_parameters].id = ast_create_node_id(ctx.ast, ctx.current_def);
     header.num_parameters = header.num_parameters + 1;
@@ -580,8 +580,8 @@ fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
   if accept(ctx, TokenKind::Arrow)  header.output = parse_type(ctx);
   else {
     //TODO Cleanup when proper field access has been implemented
-    var output: *Type = malloc(sizeof(Type));
-    output.kind = TypeKind::Unit;
+    var output: *AstType = malloc(sizeof(AstType));
+    output.kind = AstTypeKind::Void;
     header.output = output;
   }
 

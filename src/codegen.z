@@ -12,8 +12,8 @@ fn generate_block(ctx: *CodegenContext, block: *Block)
 fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt)
 fn generate_item(ctx: *CodegenContext, item: *Item)
 
-fn type_is_ptr(ty: *Type) -> bool {
-  return ty.kind == TypeKind::Ptr;
+fn type_is_ptr(ty: *AstType) -> bool {
+  return ty.kind == AstTypeKind::Ptr;
 }
 
 fn generate_prelude(ctx: *CodegenContext) {
@@ -43,13 +43,13 @@ fn generate_identifier(ctx: *CodegenContext, ident: Ident) {
   generate_sid(ctx, ident.name);
 }
 
-fn generate_type(ctx: *CodegenContext, ty: *Type) {
-  if ty.kind == TypeKind::Path  generate_sid(ctx, ty.node.path);
-  else if ty.kind == TypeKind::Ptr {
+fn generate_type(ctx: *CodegenContext, ty: *AstType) {
+  if ty.kind == AstTypeKind::Path  generate_sid(ctx, ty.node.path);
+  else if ty.kind == AstTypeKind::Ptr {
     generate_type(ctx, ty.node.ptr);
     fprintf(ctx.out, "* ");
   }
-  else if ty.kind == TypeKind::Unit {
+  else if ty.kind == AstTypeKind::Void {
     fprintf(ctx.out, "void ");
   }
   else abort();
@@ -268,8 +268,8 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 
   var i: u32 = 0;
   while i < header.num_parameters {
-    var ty: *Type = header.parameters[i].ty;
-    if ty.kind == TypeKind::Variadic {
+    var ty: *AstType = header.parameters[i].ty;
+    if ty.kind == AstTypeKind::Variadic {
       fprintf(ctx.out, "...");
       break;
     }
