@@ -35,6 +35,7 @@ fn main(argc: int, argv: **char) -> int {
   val ast: Ast = parse(&sess, root_module);
 
   resolve(&sess, &ast);
+  check(&sess, &ast);
   generate(&sess, ast, argv[2]);
 
   return 0;

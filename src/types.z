@@ -47,7 +47,8 @@ enum TyKind {
   Ptr,
   Fn,
   Enum,
-  Compound,
+  Struct,
+  Union,
   Void,
 }
 

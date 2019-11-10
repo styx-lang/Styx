@@ -128,8 +128,7 @@ fn source_snippet(m: *SourceMap, span: Span) {
     val line_start: u32 = file.lines[i];
     val line_end: u32 = file.lines[i + 1];
     var length: u32 = line_end - line_start;
-
-    memcpy(buffer, &file.content[line_start], length);
+    memcpy(buffer, &file.content[line_start + 1 - file.start], length);
     buffer[length+1] = 0;
     printf("%s\n", buffer);
     i = i + 1;

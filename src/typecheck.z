@@ -50,7 +50,7 @@ fn hash_ty(ty: *Ty) -> u64 {
 
   if ty.kind == TyKind::Signed || ty.kind == TyKind::Unsigned  h = h ^ (ty.node.integer << 4);
   else if ty.kind == TyKind::Floating  h = h ^ (ty.node.floating << 4);
-  else if ty.kind == TyKind::Compound  h = h ^ (ty.node.compound.def_id << 4);
+  else if ty.kind == TyKind::Struct || ty.kind == TyKind::Union  h = h ^ (ty.node.compound.def_id << 4);
   else if ty.kind == TyKind::Enum  h = h ^ (ty.node._enum.def_id << 4);
   else if ty.kind == TyKind::Fn  h = h ^ (hash_fn(ty) << 4);
   else if ty.kind == TyKind::Ptr  h = h ^ (hash_ty(ty.node.ptr) << 4);
@@ -58,7 +58,7 @@ fn hash_ty(ty: *Ty) -> u64 {
   return h;
 }
 
-fn intern_ty(ctx: *TypeContext, ty: Ty) -> *Ty {
+fn intern_ty_to_idx(ctx: *TypeContext, ty: Ty) -> u32 {
   val h: u64 = hash_ty(&ty);
   var ty_idx: u32 = intmap_lookup(ctx.types_lookup, h);
   if ty_idx == 0 {
@@ -66,47 +66,58 @@ fn intern_ty(ctx: *TypeContext, ty: Ty) -> *Ty {
     ctx.next_type_idx = ctx.next_type_idx + 1;
     intmap_insert(ctx.types_lookup, h, ty_idx);
   }
+  return ty_idx;
+}
+
+fn intern_ty(ctx: *TypeContext, ty: Ty) -> *Ty {
+  return &ctx.types[intern_ty_to_idx(ctx, ty)];
+}
+
+fn intern_named_ty(ctx: *TypeContext, ty: Ty, name: *char) -> *Ty {
+  val ty_idx: u32 = intern_ty_to_idx(ctx, ty);
+  val sid: Sid = intern(ctx.interner, name);
+  intmap_insert(ctx.ident_type_lookup, sid.x, ty_idx);
   return &ctx.types[ty_idx];
 }
 
-fn create_base_type(ctx: *TypeContext, kind: TyKind) -> *Ty {
+fn create_base_type(ctx: *TypeContext, kind: TyKind, name: *char) -> *Ty {
   val ty: Ty;
   ty.kind = kind;
-  return intern_ty(ctx, ty);
+  return intern_named_ty(ctx, ty, name);
 }
 
-fn create_float_type(ctx: *TypeContext, size: FloatingSize) -> *Ty {
+fn create_float_type(ctx: *TypeContext, size: FloatingSize, name: *char) -> *Ty {
   val ty: Ty;
   ty.kind = TyKind::Floating;
   ty.node.floating = size;
-  return intern_ty(ctx, ty);
+  return intern_named_ty(ctx, ty, name);
 }
 
-fn create_int_type(ctx: *TypeContext, kind: TyKind, size: IntegerSize) -> *Ty {
+fn create_int_type(ctx: *TypeContext, kind: TyKind, size: IntegerSize, name: *char) -> *Ty {
   val ty: Ty;
   ty.kind = kind;
   ty.node.integer = size;
-  return intern_ty(ctx, ty);
+  return intern_named_ty(ctx, ty, name);
 }
 
 fn create_common_types(ctx: *TypeContext) {
   val t: *CommonTypes = &ctx.common;
-  t._void = create_base_type(ctx, TyKind::Void);
-  t._bool = create_base_type(ctx, TyKind::Bool);
-  t._char = create_base_type(ctx, TyKind::Char);
+  t._void = create_base_type(ctx, TyKind::Void, "void");
+  t._bool = create_base_type(ctx, TyKind::Bool, "bool");
+  t._char = create_base_type(ctx, TyKind::Char, "char");
 
-  t._i8 = create_int_type(ctx, TyKind::Signed, IntegerSize::I8);
-  t._i16 = create_int_type(ctx, TyKind::Signed, IntegerSize::I16);
-  t._i32 = create_int_type(ctx, TyKind::Signed, IntegerSize::I32);
-  t._i64 = create_int_type(ctx, TyKind::Signed, IntegerSize::I64);
+  t._i8 = create_int_type(ctx, TyKind::Signed, IntegerSize::I8, "i8");
+  t._i16 = create_int_type(ctx, TyKind::Signed, IntegerSize::I16, "i16");
+  t._i32 = create_int_type(ctx, TyKind::Signed, IntegerSize::I32, "i32");
+  t._i64 = create_int_type(ctx, TyKind::Signed, IntegerSize::I64, "i64");
 
-  t._u8 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I8);
-  t._u16 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I16);
-  t._u32 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I32);
-  t._u64 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I64);
+  t._u8 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I8, "u8");
+  t._u16 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I16, "u16");
+  t._u32 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I32, "u32");
+  t._u64 = create_int_type(ctx, TyKind::Unsigned, IntegerSize::I64, "u64");
 
-  t._f32 = create_float_type(ctx, FloatingSize::F32);
-  t._f64 = create_float_type(ctx, FloatingSize::F64);
+  t._f32 = create_float_type(ctx, FloatingSize::F32, "f32");
+  t._f64 = create_float_type(ctx, FloatingSize::F64, "f64");
 }
 
 fn ast_type_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty;
@@ -139,8 +150,21 @@ fn type_of_node(ctx: *TypeContext, node: NodeId) -> *Ty {
   return &ctx.types[ty_idx];
 }
 
+fn ast_literal_to_ty(ctx: *TypeContext, lit: Literal) -> *Ty {
+  if lit.kind == LiteralKind::Int  return ctx.common._i32;
+  else if lit.kind == LiteralKind::Float  return ctx.common._f32;
+  else if lit.kind == LiteralKind::Bool  return ctx.common._bool;
+  else if lit.kind == LiteralKind::Char  return ctx.common._char;
+  else if lit.kind == LiteralKind::Str {
+    val str_ty: Ty;
+    str_ty.kind = TyKind::Ptr;
+    str_ty.node.ptr = ctx.common._char;
+    return intern_ty(ctx, str_ty);
+  }
+  else  abort();
+}
+
 fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty;
-fn check_block(ctx: *TypeContext, block: *Block);
 fn check_stmt(ctx: *TypeContext, stmt: *Stmt);
 fn check_item(ctx: *TypeContext, item: *Item);
 fn check_mod(ctx: *TypeContext, module: *Mod);
@@ -158,7 +182,16 @@ fn check_binary(ctx: *TypeContext, expr: *Expr) -> *Ty {
   return left;
 }
 
+fn check_block(ctx: *TypeContext, block: *Block) {
+  var i: u32 = 0;
+  while i < block.num_stmts {
+    check_stmt(ctx, block.stmts[i]);
+    i = i + 1;
+  }
+}
+
 fn check_block_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  check_block(ctx, expr.node.block);
   return ctx.common._void;
 }
 
@@ -216,9 +249,11 @@ fn check_field(ctx: *TypeContext, expr: *Expr) -> *Ty {
   var compound_ty: *Ty = check_expr(ctx, data.strct);
 
   var ptr_inner: *Ty = compound_ty.node.ptr;
-  if compound_ty.kind == TyKind::Ptr && ptr_inner.kind == TyKind::Compound  compound_ty = compound_ty.node.ptr;
+  if compound_ty.kind == TyKind::Ptr && (ptr_inner.kind == TyKind::Struct || ptr_inner.kind == TyKind::Union) {
+    compound_ty = compound_ty.node.ptr;
+  }
 
-  if compound_ty.kind != TyKind::Compound   emit_error(ctx.source_map, expr.span, "Cannot access field of non-compound type");
+  if compound_ty.kind != TyKind::Struct && compound_ty.kind != TyKind::Union   emit_error(ctx.source_map, expr.span, "Cannot access field of non-compound type");
 
   val compound: CompoundDef = compound_ty.node.compound;
 
@@ -246,6 +281,7 @@ fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
   else if expr.kind == ExprKind::Indexing  return check_indexing(ctx, expr);
   else if expr.kind == ExprKind::Field  return check_field(ctx, expr);
   else if expr.kind == ExprKind::Path  return check_path(ctx, &expr.node.path);
+  else if expr.kind == ExprKind::Literal  return ast_literal_to_ty(ctx, expr.node.lit);
   else abort();
 }
 
@@ -271,17 +307,19 @@ fn check_stmt(ctx: *TypeContext, stmt: *Stmt) {
 fn check_variable(ctx: *TypeContext, item: *Item) {
   var decl_ty: *Ty = ast_type_to_ty(ctx, item.node.variable.ty);
 
-  var body: *Body = ast_get_body(ctx.ast, item.node.variable.body);
-  if body > 0 {
+  printf("Checking %s\n", get_str(ctx.interner, item.ident.name));
+
+  if item.node.variable.body.def > 0 {
+    var body: *Body = ast_get_body(ctx.ast, item.node.variable.body);
     var expr_ty: *Ty = check_expr(ctx, body.value);
-    if decl_ty != expr_ty  emit_error(ctx.source_map, item.span, "Variable type declaration does not match expression type");
+    if decl_ty != expr_ty  emit_warning(ctx.source_map, item.span, "Variable type declaration does not match expression type");
   }
 }
 
 fn check_function(ctx: *TypeContext, item: *Item) {
 
-  var body: *Body = ast_get_body(ctx.ast, item.node.variable.body);
-  if body > 0 {
+  if item.node.function.body.def > 0 {
+    var body: *Body = ast_get_body(ctx.ast, item.node.function.body);
     check_expr(ctx, body.value);
   }
 }
@@ -303,12 +341,85 @@ fn check_mod(ctx: *TypeContext, module: *Mod) {
   }
 }
 
+fn collect_enum(ctx: *TypeContext, item: *Item) {
+  val def: EnumDef;
+  def.def_id = item.id.def;
+  def.variants = malloc(sizeof(Ident) * item.node._enum.num_variants);
+
+  var i: u32 = 0;
+  while i < item.node._enum.num_variants {
+    def.variants[i] = item.node._enum.variants[i].ident;
+    i = i + 1;
+  }
+  def.num_variants = item.node._enum.num_variants;
+
+  val ty: Ty;
+  ty.kind = TyKind::Enum;
+  ty.node._enum = def;
+
+  val ty_idx: u32 = intern_ty_to_idx(ctx, ty);
+  intmap_insert(ctx.ident_type_lookup, item.ident.name.x, ty_idx);
+}
+
+fn collect_function(ctx: *TypeContext, item: *Item) {
+
+}
+
+fn collect_compound(ctx: *TypeContext, item: *Item) {
+
+  val def: CompoundDef;
+  def.def_id = item.id.def;
+  def.fields = malloc(sizeof(FieldDef) * item.node.compound.num_fields);
+
+  var i: u32 = 0;
+  while i < item.node.compound.num_fields {
+    def.fields[i].ident = item.node.compound.fields[i].ident;
+    def.fields[i].ty = ast_type_to_ty(ctx, item.node.compound.fields[i].ty);
+    i = i + 1;
+  }
+  def.num_fields = item.node.compound.num_fields;
+
+  val ty: Ty;
+  if item.kind == ItemKind::Struct  ty.kind = TyKind::Struct;
+  else if item.kind == ItemKind::Union  ty.kind = TyKind::Union;
+
+  ty.node.compound = def;
+
+  val ty_idx: u32 = intern_ty_to_idx(ctx, ty);
+  intmap_insert(ctx.ident_type_lookup, item.ident.name.x, ty_idx);
+}
+
+fn collect_mod(ctx: *TypeContext, module: *Mod);
+
+fn collect_item(ctx: *TypeContext, item: *Item) {
+  if item.kind == ItemKind::Enum  collect_enum(ctx, item);
+  if item.kind == ItemKind::Function  collect_function(ctx, item);
+  else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  collect_compound(ctx, item);
+  else if item.kind == ItemKind::Mod  collect_mod(ctx, &item.node.module);
+}
+
+fn collect_mod(ctx: *TypeContext, module: *Mod) {
+  var i: u32 = 0;
+  while i < module.num_items {
+    var item: *Item = ast_get_item(ctx.ast, module.items[i]);
+    collect_item(ctx, item);
+    i = i + 1;
+  }
+}
+
 fn check(sess: *Session, ast: *Ast) {
   var ctx: TypeContext;
 
+  ctx.ast = ast;
   ctx.interner = &sess.interner;
   ctx.source_map = &sess.source;
-  ctx.ast = ast;
+  ctx.types_lookup = intmap_create(1024);
+  ctx.types = malloc(sizeof(Ty) * 1024);
+  ctx.next_type_idx = 1;
+  ctx.ident_type_lookup = intmap_create(1024);
+  ctx.node_type_lookup = intmap_create(1024);
+  create_common_types(&ctx);
 
+  collect_mod(&ctx, &ast.root_module);
   check_mod(&ctx, &ast.root_module);
 }

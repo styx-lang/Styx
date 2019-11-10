@@ -4,3 +4,9 @@ fn emit_error(m: *SourceMap, span: Span, msg: *char) {
   source_snippet(m, span);
   abort();
 }
+
+
+fn emit_warning(m: *SourceMap, span: Span, msg: *char) {
+  printf("warning: %s\n", msg);
+  source_snippet(m, span);
+}
