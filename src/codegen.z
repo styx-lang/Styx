@@ -186,6 +186,12 @@ fn generate_path(ctx: *CodegenContext, path: Path) {
   }
 }
 
+fn generate_sizeof(ctx: *CodegenContext, expr: *Expr) {
+  fprintf(ctx.out, "sizeof(");
+  generate_expr(ctx, expr);
+  fprintf(ctx.out, ")");
+}
+
 fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
    if expr.kind == ExprKind::Unary  generate_unary(ctx, expr.node.unary);
    else if expr.kind == ExprKind::Binary  generate_binary(ctx, expr.node.binary);
@@ -197,6 +203,7 @@ fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
    else if expr.kind == ExprKind::Field  generate_field(ctx, expr.node.field);
    else if expr.kind == ExprKind::Literal  generate_literal(ctx, expr.node.lit);
    else if expr.kind == ExprKind::Path  generate_path(ctx, expr.node.path);
+   else if expr.kind == ExprKind::Sizeof  generate_sizeof(ctx, expr.node._sizeof);
    else abort();
 }
 

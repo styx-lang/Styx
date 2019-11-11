@@ -103,6 +103,7 @@ fn is_keyword(s: *char) -> TokenKind {
   if !strcmp(s, "mod") return TokenKind::Mod;
   if !strcmp(s, "return")  return TokenKind::Return;
   if !strcmp(s, "struct")  return TokenKind::Struct;
+  if !strcmp(s, "sizeof")  return TokenKind::Sizeof;
   if !strcmp(s, "true")  return TokenKind::True;
   if !strcmp(s, "union")  return TokenKind::Union;
   if !strcmp(s, "use")  return TokenKind::Use;

@@ -178,6 +178,7 @@ enum ExprKind {
   Indexing,
   Path,
   Literal,
+  Sizeof,
   Unary,
   While,
 }
@@ -191,6 +192,7 @@ union ExprKindNode {
   indexing: IndexingData,
   path: Path,
   lit: Literal,
+  _sizeof: *Expr,
   unary: UnaryData,
   whl: WhileData,
 }

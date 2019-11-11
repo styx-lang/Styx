@@ -19,6 +19,7 @@ enum TokenKind {
     Return,
     Static,
     Struct,
+    Sizeof,
     Union,
     Use,
     Var,

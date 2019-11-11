@@ -390,6 +390,17 @@ fn parse_while(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
+fn parse_sizeof(ctx: *ParsingContext) -> *Expr {
+  expect(ctx, TokenKind::Sizeof);
+  expect(ctx, TokenKind::LeftParen);
+
+  var expr: *Expr = ast_create_expr(ctx.ast, ctx.current_def, ExprKind::Sizeof);
+  expr.node._sizeof = parse_expression(ctx, 0);
+  expect(ctx, TokenKind::RightParen);
+
+  return expr;
+}
+
 fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
   val tok: Token = look_ahead(ctx, 0);
   var span: Span;
@@ -406,6 +417,7 @@ fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
   else if (tok.kind == TokenKind::Minus || tok.kind == TokenKind::Bang ||
            tok.kind == TokenKind::And || tok.kind == TokenKind::Star) left = parse_prefix_operator(ctx);
   else if tok.kind == TokenKind::If  left = parse_if(ctx);
+  else if tok.kind == TokenKind::Sizeof  left = parse_sizeof(ctx);
   else if tok.kind == TokenKind::While  left = parse_while(ctx);
   else if tok.kind == TokenKind::LeftParen {
     expect(ctx, TokenKind::LeftParen);
