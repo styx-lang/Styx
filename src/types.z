@@ -13,10 +13,29 @@ enum FloatingSize {
   Float_Unspecified,
 }
 
+enum PrimitiveTyKind {
+  Void,
+  Signed,
+  Unsigned,
+  Floating,
+  Bool,
+  Char,
+}
+
+union PrimitiveTyNode {
+  integer: IntegerSize,
+  floating: FloatingSize,
+}
+
+struct PrimitiveTy {
+  node: PrimitiveTyNode,
+  kind: PrimitiveTyKind,
+}
+
 struct Ty {};
 
 struct FieldDef {
-  ident: Ident,
+  name: Sid,
   ty: *Ty,
 }
 
@@ -28,7 +47,7 @@ struct CompoundDef {
 
 struct EnumDef {
   def_id: u32,
-  variants: *Ident,
+  variants: *Sid,
   num_variants: u32,
 }
 

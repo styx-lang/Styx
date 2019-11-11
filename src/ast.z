@@ -14,10 +14,12 @@ struct Ident {
 
 enum ResKind {
   Definition,
+  Primitive,
 }
 
 union ResNode {
   def: NodeId,
+  prim: PrimitiveTy,
 }
 
 struct Res {

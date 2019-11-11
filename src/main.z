@@ -8,9 +8,9 @@ mod interning;
 mod session;
 mod tokens;
 mod lexer;
+mod types;
 mod ast;
 mod parser;
-mod types;
 mod resolution;
 mod typecheck;
 mod codegen;
@@ -35,7 +35,7 @@ fn main(argc: int, argv: **char) -> int {
   val ast: Ast = parse(&sess, root_module);
 
   resolve(&sess, &ast);
-  check(&sess, &ast);
+  //check(&sess, &ast);
   generate(&sess, ast, argv[2]);
 
   return 0;

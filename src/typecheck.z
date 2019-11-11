@@ -259,7 +259,7 @@ fn check_field(ctx: *TypeContext, expr: *Expr) -> *Ty {
 
   var i: u32 = 0;
   while i < compound.num_fields {
-    if compound.fields[i].ident.name.x == data.ident.name.x {
+    if compound.fields[i].name.x == data.ident.name.x {
       return compound.fields[i].ty;
     }
   }
@@ -348,7 +348,7 @@ fn collect_enum(ctx: *TypeContext, item: *Item) {
 
   var i: u32 = 0;
   while i < item.node._enum.num_variants {
-    def.variants[i] = item.node._enum.variants[i].ident;
+    def.variants[i] = item.node._enum.variants[i].ident.name;
     i = i + 1;
   }
   def.num_variants = item.node._enum.num_variants;
@@ -373,7 +373,7 @@ fn collect_compound(ctx: *TypeContext, item: *Item) {
 
   var i: u32 = 0;
   while i < item.node.compound.num_fields {
-    def.fields[i].ident = item.node.compound.fields[i].ident;
+    def.fields[i].name = item.node.compound.fields[i].ident.name;
     def.fields[i].ty = ast_type_to_ty(ctx, item.node.compound.fields[i].ty);
     i = i + 1;
   }

@@ -4,12 +4,45 @@ struct Scope {
   next_local: u32,
 }
 
+struct PrimitiveTypeSids {
+  _void: Sid,
+  _bool: Sid,
+  _char: Sid,
+  _i8: Sid,
+  _i16: Sid,
+  _i32: Sid,
+  _i64: Sid,
+  _u8: Sid,
+  _u16: Sid,
+  _u32: Sid,
+  _u64: Sid,
+  _f32: Sid,
+  _f64: Sid,
+}
+
+fn setup_primitive_ty_sids(i: *Interner, p: *PrimitiveTypeSids) {
+  p._void = intern(i, "void");
+  p._bool = intern(i, "bool");
+  p._char = intern(i, "char");
+  p._i8 = intern(i, "i8");
+  p._i16 = intern(i, "i16");
+  p._i32 = intern(i, "i32");
+  p._i64 = intern(i, "i64");
+  p._u8 = intern(i, "u8");
+  p._u16 = intern(i, "u16");
+  p._u32 = intern(i, "u32");
+  p._u64 = intern(i, "u64");
+  p._f32 = intern(i, "f32");
+  p._f64 = intern(i, "f64");
+}
+
 struct ResolutionContext {
   scope_stack: *Scope,
   stack_top: u32,
   ast: *Ast,
   source_map: *SourceMap,
   interner: *Interner,
+  primitive_ty_sids: PrimitiveTypeSids,
 }
 
 fn encode_id(id: NodeId) -> u64 {
@@ -57,9 +90,40 @@ fn scan_item(ctx: *ResolutionContext, item: *Item) {
   push_ident(ctx, item.ident, item.id);
 }
 
+fn check_if_sid_is_primitive(ctx: *ResolutionContext, s: Sid, prim: *PrimitiveTy) -> bool {
+
+  val p: *PrimitiveTypeSids = &ctx.primitive_ty_sids;
+  if s.x == p._void.x  prim.kind = PrimitiveTyKind::Void;
+  else if s.x == p._bool.x  prim.kind = PrimitiveTyKind::Bool;
+  else if s.x == p._char.x  prim.kind = PrimitiveTyKind::Char;
+
+  else if s.x == p._i8.x { prim.kind = PrimitiveTyKind::Signed; prim.node.integer = IntegerSize::I8; }
+  else if s.x == p._i16.x { prim.kind = PrimitiveTyKind::Signed; prim.node.integer = IntegerSize::I16; }
+  else if s.x == p._i32.x { prim.kind = PrimitiveTyKind::Signed; prim.node.integer = IntegerSize::I32; }
+  else if s.x == p._i64.x { prim.kind = PrimitiveTyKind::Signed; prim.node.integer = IntegerSize::I64; }
+
+  else if s.x == p._u8.x { prim.kind = PrimitiveTyKind::Unsigned; prim.node.integer = IntegerSize::I8; }
+  else if s.x == p._u16.x { prim.kind = PrimitiveTyKind::Unsigned; prim.node.integer = IntegerSize::I16; }
+  else if s.x == p._u32.x { prim.kind = PrimitiveTyKind::Unsigned; prim.node.integer = IntegerSize::I32; }
+  else if s.x == p._u64.x { prim.kind = PrimitiveTyKind::Unsigned; prim.node.integer = IntegerSize::I64; }
+
+  else if s.x == p._f32.x { prim.kind = PrimitiveTyKind::Floating; prim.node.floating = FloatingSize::F32; }
+  else if s.x == p._f64.x { prim.kind = PrimitiveTyKind::Floating; prim.node.floating = FloatingSize::F64; }
+
+  else  return false;
+
+  return true;
+}
+
 fn resolve_path(ctx: *ResolutionContext, path: *Path) {
   var id: NodeId;
-  if lookup_ident(ctx, path.segments[0], &id) {
+  var prim: PrimitiveTy;
+
+  if check_if_sid_is_primitive(ctx, path.segments[0].name, &prim) {
+    path.res.kind = ResKind::Primitive;
+    path.res.node.prim = prim;
+  }
+  else if lookup_ident(ctx, path.segments[0], &id) {
     path.res.kind = ResKind::Definition;
     path.res.node.def = id;
   }
@@ -217,6 +281,7 @@ fn resolve(sess: *Session, ast: *Ast) {
   var ctx: ResolutionContext;
 
   ctx.interner = &sess.interner;
+  setup_primitive_ty_sids(ctx.interner, &ctx.primitive_ty_sids);
   ctx.ast = ast;
   ctx.scope_stack = malloc(sizeof(Scope) * 128);
   ctx.stack_top = 0;
