@@ -9,7 +9,6 @@ struct CodegenContext {
 
 fn generate_expr(ctx: *CodegenContext, expr: *Expr)
 fn generate_block(ctx: *CodegenContext, block: *Block)
-fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt)
 fn generate_item(ctx: *CodegenContext, item: *Item)
 
 fn type_is_ptr(ty: *AstType) -> bool {
@@ -74,10 +73,6 @@ fn generate_literal(ctx: *CodegenContext, lit: Literal) {
   }
   else if lit.kind == LiteralKind::Char  generate_char(ctx, lit.value.ch);
   else abort();
-}
-
-fn generate_body(ctx: *CodegenContext, body: *Body) {
-  generate_expr(ctx, body.value);
 }
 
 fn generate_unary(ctx: *CodegenContext, unary: UnaryData) {
@@ -192,21 +187,6 @@ fn generate_sizeof(ctx: *CodegenContext, expr: *Expr) {
   fprintf(ctx.out, ")");
 }
 
-fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
-   if expr.kind == ExprKind::Unary  generate_unary(ctx, expr.node.unary);
-   else if expr.kind == ExprKind::Binary  generate_binary(ctx, expr.node.binary);
-   else if expr.kind == ExprKind::Block  generate_block(ctx, expr.node.block);
-   else if expr.kind == ExprKind::Call  generate_call(ctx, expr.node.call);
-   else if expr.kind == ExprKind::Conditional  generate_conditional(ctx, expr.node.conditional);
-   else if expr.kind == ExprKind::While  generate_while(ctx, expr.node.whl);
-   else if expr.kind == ExprKind::Indexing  generate_indexing(ctx, expr.node.indexing);
-   else if expr.kind == ExprKind::Field  generate_field(ctx, expr.node.field);
-   else if expr.kind == ExprKind::Literal  generate_literal(ctx, expr.node.lit);
-   else if expr.kind == ExprKind::Path  generate_path(ctx, expr.node.path);
-   else if expr.kind == ExprKind::Sizeof  generate_sizeof(ctx, expr.node._sizeof);
-   else abort();
-}
-
 fn generate_assignment(ctx: *CodegenContext, assignment: AssignmentData) {
   generate_expr(ctx, assignment.left);
   fprintf(ctx.out, " = ");
@@ -220,23 +200,39 @@ fn generate_return(ctx: *CodegenContext, expr: *Expr) {
   fprintf(ctx.out, ";\n");
 }
 
-fn generate_stmt(ctx: *CodegenContext, stmt: *Stmt) {
-  emit_line_directive(ctx.out, ctx.source, stmt.span);
-  if stmt.kind == StmtKind::Assignment generate_assignment(ctx, stmt.node.assignment);
-  else if stmt.kind == StmtKind::Break  fprintf(ctx.out, "break;\n");
-  else if stmt.kind == StmtKind::Continue  fprintf(ctx.out, "continue;\n");
-  else if stmt.kind == StmtKind::Expr { generate_expr(ctx, stmt.node.expr); fprintf(ctx.out, ";\n"); }
-  else if stmt.kind == StmtKind::Item  generate_item(ctx, ast_get_item(ctx.ast, stmt.node.item));
-  else if stmt.kind == StmtKind::Return  generate_return(ctx, stmt.node._return);
-  else abort();
+fn generate_control_flow(ctx: *CodegenContext, is_continue: bool) {
+  if is_continue  fprintf(ctx.out, "continue;\n");
+  else  fprintf(ctx.out, "break;\n");
+}
+
+fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
+   if expr.kind == ExprKind::Unary  generate_unary(ctx, expr.node.unary);
+   else if expr.kind == ExprKind::Binary  generate_binary(ctx, expr.node.binary);
+   else if expr.kind == ExprKind::Block  generate_block(ctx, expr.node.block);
+   else if expr.kind == ExprKind::Call  generate_call(ctx, expr.node.call);
+   else if expr.kind == ExprKind::Conditional  generate_conditional(ctx, expr.node.conditional);
+   else if expr.kind == ExprKind::While  generate_while(ctx, expr.node.whl);
+   else if expr.kind == ExprKind::Indexing  generate_indexing(ctx, expr.node.indexing);
+   else if expr.kind == ExprKind::Field  generate_field(ctx, expr.node.field);
+   else if expr.kind == ExprKind::Literal  generate_literal(ctx, expr.node.lit);
+   else if expr.kind == ExprKind::Path  generate_path(ctx, expr.node.path);
+   else if expr.kind == ExprKind::Sizeof  generate_sizeof(ctx, expr.node._sizeof);
+   else if expr.kind == ExprKind::Assignment generate_assignment(ctx, expr.node.assignment);
+   else if expr.kind == ExprKind::ControlFlow  generate_control_flow(ctx, expr.node.control_flow_is_continue);
+   else if expr.kind == ExprKind::Item  generate_item(ctx, expr.node.item);
+   else if expr.kind == ExprKind::Return  generate_return(ctx, expr.node._return);
+   else abort();
 }
 
 fn generate_block(ctx: *CodegenContext, block: *Block) {
   fprintf(ctx.out, "{\n");
   var i: u32 = 0;
 
-  while i < block.num_stmts {
-    generate_stmt(ctx, block.stmts[i]);
+  while i < block.num_exprs {
+    var expr: *Expr = block.exprs[i];
+    emit_line_directive(ctx.out, ctx.source, expr.span);
+    generate_expr(ctx, expr);
+    fprintf(ctx.out, ";\n");
     i = i + 1;
   }
   fprintf(ctx.out, "}\n");
@@ -253,9 +249,9 @@ fn generate_variable(ctx: *CodegenContext, item: *Item) {
 
   strmap_insert(ctx.ident_is_ptr, var_name, type_is_ptr(item.node.variable.ty));
   fprintf(ctx.out, " %s ", var_name);
-  if item.node.variable.body.local {
+  if item.node.variable.body {
     fprintf(ctx.out, "= ");
-    generate_body(ctx, ast_get_body(ctx.ast, item.node.variable.body));
+    generate_expr(ctx, item.node.variable.body);
   }
   fprintf(ctx.out, ";\n");
 }
@@ -290,7 +286,7 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
     i = i + 1;
   }
   fprintf(ctx.out, ") ");
-  if func.body.local  generate_body(ctx, ast_get_body(ctx.ast, func.body));
+  if func.body  generate_expr(ctx, func.body);
   else  fprintf(ctx.out, ";\n");
 }
 
@@ -344,8 +340,7 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
 fn generate_mod(ctx: *CodegenContext, module: *Mod) {
   var i: u32 = 0;
   while i < module.num_items {
-    var item: *Item = ast_get_item(ctx.ast, module.items[i]);
-    generate_item(ctx, item);
+    generate_item(ctx, module.items[i]);
     i = i + 1;
   }
 }

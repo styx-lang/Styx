@@ -11,8 +11,6 @@ mod lexer;
 mod types;
 mod ast;
 mod parser;
-mod resolution;
-mod typecheck;
 mod codegen;
 
 fn basename(path: *char) -> *char
@@ -34,7 +32,7 @@ fn main(argc: int, argv: **char) -> int {
 
   val ast: Ast = parse(&sess, root_module);
 
-  resolve(&sess, &ast);
+  //resolve(&sess, &ast);
   //check(&sess, &ast);
   generate(&sess, ast, argv[2]);
 

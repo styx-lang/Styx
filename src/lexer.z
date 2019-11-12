@@ -246,7 +246,7 @@ fn scan_token(ctx: *LexingContext) {
   }
 }
 
-fn lex(sess: *Session, source: *SourceFile, tokens: **Token, num_tokens: *u32) {
+fn lex(sess: *Session, source: *SourceFile, num_tokens: *u32) -> *Token {
 
   var ctx: *LexingContext = malloc(sizeof(LexingContext));
   ctx.source = source;
@@ -271,6 +271,6 @@ fn lex(sess: *Session, source: *SourceFile, tokens: **Token, num_tokens: *u32) {
     abort();
   };
 
-  *tokens = ctx.tokens;
   *num_tokens = ctx.current_token_idx;
+  return ctx.tokens;
 }

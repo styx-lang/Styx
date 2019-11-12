@@ -3,11 +3,6 @@ struct AstType {}
 struct Expr {}
 struct Block {}
 
-struct NodeId {
-  def: u32,
-  local: u32,
-}
-
 struct Ident {
   name: Sid,
 }
@@ -18,7 +13,6 @@ enum ResKind {
 }
 
 union ResNode {
-  def: NodeId,
   prim: PrimitiveTy,
 }
 
@@ -34,9 +28,11 @@ struct Path {
   span: Span,
 }
 
+struct Item {}
+
 struct Mod {
   span: Span,
-  items: *NodeId,
+  items: **Item,
   num_items: u32,
 }
 
@@ -48,7 +44,6 @@ enum AstTypeKind {
 }
 
 struct GenericParam {
-  id: NodeId,
   ident: Ident,
 }
 
@@ -64,7 +59,6 @@ union AstTypeKindNode {
 }
 
 struct AstType {
-  id: NodeId,
   kind: AstTypeKind,
   node: AstTypeKindNode,
 }
@@ -169,6 +163,11 @@ struct UnaryData {
   inner: *Expr,
 }
 
+struct AssignmentData {
+  left: *Expr,
+  right: *Expr,
+}
+
 enum ExprKind {
   Binary,
   Block,
@@ -181,6 +180,13 @@ enum ExprKind {
   Sizeof,
   Unary,
   While,
+  Assignment,
+  Item,
+  Expr,
+  Return,
+  ControlFlow,
+  Defer,
+  Empty,
 }
 
 union ExprKindNode {
@@ -188,6 +194,7 @@ union ExprKindNode {
   block: *Block,
   call: CallData,
   conditional: ConditionalData,
+  control_flow_is_continue: bool,
   field: FieldData,
   indexing: IndexingData,
   path: Path,
@@ -195,55 +202,21 @@ union ExprKindNode {
   _sizeof: *Expr,
   unary: UnaryData,
   whl: WhileData,
+  assignment: AssignmentData,
+  _return: *Expr,
+  item: *Item,
 }
 
 struct Expr {
-  id: NodeId,
   span: Span,
   kind: ExprKind,
   node: ExprKindNode,
 }
 
-struct AssignmentData {
-  left: *Expr,
-  right: *Expr,
-}
-
-enum StmtKind {
-  Assignment,
-  Item,
-  Expr,
-  Return,
-  Break,
-  Continue,
-  Defer,
-  Empty,
-}
-
-union StmtKindNode {
-  assignment: AssignmentData,
-  item: NodeId,
-  expr: *Expr,
-  _return: *Expr,
-  _defer: *Expr,
-}
-
-struct Stmt {
-  kind: StmtKind,
-  node: StmtKindNode,
-  span: Span,
-  id: NodeId,
-}
-
 struct Block {
-  stmts: **Stmt,
-  num_stmts: u32,
-  id: NodeId,
+  exprs: **Expr,
+  num_exprs: u32,
   span: Span,
-}
-
-struct Body {
-  value: *Expr,
 }
 
 enum VisibilityKind {
@@ -257,7 +230,6 @@ struct Visibility {
 
 struct CompoundField {
   ident: Ident,
-  id: NodeId,
   ty: *AstType,
 }
 
@@ -269,7 +241,6 @@ struct CompoundData {
 
 struct EnumVariant {
   ident: Ident,
-  id: NodeId,
 }
 
 struct EnumData {
@@ -279,7 +250,6 @@ struct EnumData {
 
 struct FunctionParameter {
   ident: Ident,
-  id: NodeId,
   ty: *AstType,
 }
 
@@ -293,7 +263,7 @@ struct FunctionHeader {
 
 struct FunctionData {
   header: FunctionHeader,
-  body: NodeId,
+  body: *Expr,
 }
 
 struct UseData {
@@ -303,7 +273,7 @@ struct UseData {
 struct VariableData {
   ty: *AstType,
   mutable: bool,
-  body: NodeId,
+  body: *Expr,
 }
 
 enum ItemKind {
@@ -328,7 +298,6 @@ union ItemKindNode {
 
 struct Item {
   ident: Ident,
-  id: NodeId,
   kind: ItemKind,
   node: ItemKindNode,
   vis: Visibility,
@@ -336,76 +305,23 @@ struct Item {
 }
 
 struct Ast {
-  body_map: *IntMap,
-  bodies: *Body,
-  num_bodies: u32,
-
   items: *Item,
   num_items: u32,
-
-  next_local: *u32,
 
   root_module: Mod,
 }
 
-fn ast_create_node_id(ast: *Ast, def: NodeId) -> NodeId {
-  val id: NodeId;
-  id.def = def.def;
-  ast.next_local[def.def] = ast.next_local[def.def] + 1;
-  id.local = ast.next_local[def.def];
-  return id;
-}
-
-fn ast_create_expr(ast: *Ast, def: NodeId, kind: ExprKind) -> *Expr {
+fn ast_create_expr(ast: *Ast, kind: ExprKind) -> *Expr {
   var expr: *Expr = malloc(sizeof(Expr));
   expr.kind = kind;
-  expr.id = ast_create_node_id(ast, def);
 
   return expr;
 }
 
-fn ast_create_stmt(ast: *Ast, def: NodeId) -> *Stmt {
-  var stmt: *Stmt = malloc(sizeof(Stmt));
-  stmt.id = ast_create_node_id(ast, def);
-
-  return stmt;
-}
-
-fn ast_create_body(ast: *Ast, expr: *Expr) -> NodeId {
-
-  val idx: u32 = ast.num_bodies;
-  var body: *Body = &ast.bodies[idx];
-  ast.num_bodies = ast.num_bodies + 1;
-
-  body.value = expr;
-
-  val def: u64 = expr.id.def;
-  val local: u64 = expr.id.local;
-  val key: u64 = (def << 32) | local;
-  intmap_insert(ast.body_map, key, idx);
-
-  return expr.id;
-}
-
-fn ast_get_body(ast: *Ast, id: NodeId) -> *Body {
-  val def: u64 = id.def;
-  val key: u64 = (def << 32) | (id.local);
-  val idx: u32 = intmap_lookup(ast.body_map, key);
-  return &ast.bodies[idx];
-}
-
 fn ast_create_item(ast: *Ast) -> *Item {
 
-  val idx: u32 = ast.num_items;
-  var item: *Item = &ast.items[idx];
+  var item: *Item = &ast.items[ast.num_items];
   ast.num_items = ast.num_items + 1;
 
-  item.id.def = idx;
-  item.id.local = 0;
-
   return item;
-}
-
-fn ast_get_item(ast: *Ast, id: NodeId) -> *Item {
-  return &ast.items[id.def];
 }
