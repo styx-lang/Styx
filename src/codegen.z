@@ -42,6 +42,10 @@ fn generate_identifier(ctx: *CodegenContext, ident: Ident) {
   generate_sid(ctx, ident.name);
 }
 
+fn generate_pattern(ctx: *CodegenContext, pat: Pattern) {
+  generate_identifier(ctx, pat.ident);
+}
+
 fn generate_type(ctx: *CodegenContext, ty: *AstType) {
   if ty.kind == AstTypeKind::Path  generate_sid(ctx, ty.node.path);
   else if ty.kind == AstTypeKind::Ptr {
@@ -205,6 +209,22 @@ fn generate_control_flow(ctx: *CodegenContext, is_continue: bool) {
   else  fprintf(ctx.out, "break;\n");
 }
 
+fn generate_let(ctx: *CodegenContext, data: LetData) {
+
+  generate_type(ctx, data.ty);
+
+  var sess: *Session = ctx.sess;
+  var var_name: *char = get_str(&sess.interner, data.pat.ident.name);
+
+  strmap_insert(ctx.ident_is_ptr, var_name, type_is_ptr(data.ty));
+  fprintf(ctx.out, " %s ", var_name);
+  if data.value {
+    fprintf(ctx.out, "= ");
+    generate_expr(ctx, data.value);
+  }
+  fprintf(ctx.out, ";\n");
+}
+
 fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
    if expr.kind == ExprKind::Unary  generate_unary(ctx, expr.node.unary);
    else if expr.kind == ExprKind::Binary  generate_binary(ctx, expr.node.binary);
@@ -219,7 +239,7 @@ fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
    else if expr.kind == ExprKind::Sizeof  generate_sizeof(ctx, expr.node._sizeof);
    else if expr.kind == ExprKind::Assignment generate_assignment(ctx, expr.node.assignment);
    else if expr.kind == ExprKind::ControlFlow  generate_control_flow(ctx, expr.node.control_flow_is_continue);
-   else if expr.kind == ExprKind::Item  generate_item(ctx, expr.node.item);
+   else if expr.kind == ExprKind::Let  generate_let(ctx, expr.node._let);
    else if expr.kind == ExprKind::Return  generate_return(ctx, expr.node._return);
    else abort();
 }
@@ -279,7 +299,7 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 
     generate_type(ctx, ty);
 
-    var param_name: *char = get_str(&sess.interner, header.parameters[i].ident.name);
+    var param_name: *char = get_str(&sess.interner, header.parameters[i].pat.ident.name);
     strmap_insert(ctx.ident_is_ptr, param_name, type_is_ptr(header.parameters[i].ty));
     fprintf(ctx.out, " %s", param_name);
     if i < header.num_parameters - 1  fprintf(ctx.out, ", ");
@@ -337,7 +357,7 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
   }
 }
 
-fn generate_mod(ctx: *CodegenContext, module: *Mod) {
+fn generate_mod(ctx: *CodegenContext, module: *Module) {
   var i: u32 = 0;
   while i < module.num_items {
     generate_item(ctx, module.items[i]);
@@ -351,7 +371,7 @@ fn generate_item(ctx: *CodegenContext, item: *Item) {
   else if item.kind == ItemKind::Enum   generate_enum(ctx, item);
   else if item.kind == ItemKind::Function   generate_function(ctx, item);
   else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  generate_compound(ctx, item);
-  else if item.kind == ItemKind::Mod  generate_mod(ctx, &item.node.module);
+  else if item.kind == ItemKind::Module  generate_mod(ctx, &item.node.module);
   fprintf(ctx.out, "\n");
 }
 

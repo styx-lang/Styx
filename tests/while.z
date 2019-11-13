@@ -1,3 +1,4 @@
+fn printf(format: *constchar, args: ...) -> i32
 
 fn main() {
   var i: i32 = 0;

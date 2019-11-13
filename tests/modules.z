@@ -1,3 +1,5 @@
+fn printf(format: *constchar, args: ...) -> i32
+
 mod module_a {
   fn A() {
     printf("A\n");

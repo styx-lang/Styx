@@ -62,12 +62,15 @@ fn span_end(ctx: *ParsingContext) -> u32 {
 
 fn parse_identifier(ctx: *ParsingContext) -> Ident {
 
+  var ident: Ident;
+  ident.span.from = span_start(ctx);
   var tok: Token = consume(ctx);
 
   if tok.kind != TokenKind::Identifier  emit_error(ctx.source_map, tok.span, "Invalid identifier");
 
-  var ident: Ident;
   ident.name = tok.lexeme;
+  ident.span.to = span_end(ctx);
+
   return ident;
 }
 
@@ -91,6 +94,14 @@ fn parse_path_expr(ctx: *ParsingContext) -> *Expr {
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Path);
   expr.node.path = parse_path(ctx);
   return expr;
+}
+
+fn parse_pattern(ctx: *ParsingContext) -> Pattern {
+  var pat: Pattern;
+  pat.span.from = span_start(ctx);
+  pat.ident = parse_identifier(ctx);
+  pat.span.to = span_start(ctx);
+  return pat;
 }
 
 fn parse_type(ctx: *ParsingContext) -> *AstType {
@@ -410,11 +421,16 @@ fn parse_sizeof(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_item(ctx: *ParsingContext) -> *Item
+fn parse_let(ctx: *ParsingContext) -> *Expr {
 
-fn parse_item_expr(ctx: *ParsingContext) -> *Expr {
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Item);
-  expr.node.item = parse_item(ctx);
+  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Let);
+  consume(ctx);
+  expr.node._let.pat = parse_pattern(ctx);
+  expect(ctx, TokenKind::Colon);
+  expr.node._let.ty = parse_type(ctx);
+
+  if accept(ctx, TokenKind::Equal)  expr.node._let.value = parse_expression(ctx, 0);
+  else  expr.node._let.value = 0;
 
   return expr;
 }
@@ -456,7 +472,7 @@ fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
   else if tok.kind == TokenKind::While  left = parse_while(ctx);
   else if tok.kind == TokenKind::Continue || tok.kind == TokenKind::Break  left = parse_control_flow(ctx);
   else if tok.kind == TokenKind::Return  left = parse_return(ctx);
-  else if tok.kind == TokenKind::Var || tok.kind == TokenKind::Val  left = parse_item_expr(ctx);
+  else if tok.kind == TokenKind::Var || tok.kind == TokenKind::Val  left = parse_let(ctx);
   else if tok.kind == TokenKind::Identifier  left = parse_path_expr(ctx);
   else if tok.kind == TokenKind::LeftParen {
     expect(ctx, TokenKind::LeftParen);
@@ -571,7 +587,7 @@ fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
 
   while !accept(ctx, TokenKind::RightParen) {
 
-    header.parameters[header.num_parameters].ident = parse_identifier(ctx);
+    header.parameters[header.num_parameters].pat = parse_pattern(ctx);
 
     expect(ctx, TokenKind::Colon);
     val type: *AstType = parse_type(ctx);
@@ -613,14 +629,14 @@ fn parse_use(ctx: *ParsingContext, item: *Item) {
   accept(ctx, TokenKind::Semicolon);
 }
 
-fn parse_mod_inner(ctx: *ParsingContext) -> Mod
-fn parse_mod_external(sess: *Session, ast: *Ast, path: *char) -> Mod
+fn parse_mod_inner(ctx: *ParsingContext) -> Module
+fn parse_mod_external(sess: *Session, ast: *Ast, path: *char) -> Module
 
 fn parse_mod(ctx: *ParsingContext, item: *Item) {
   expect(ctx, TokenKind::Mod);
 
   item.ident = parse_identifier(ctx);
-  item.kind = ItemKind::Mod;
+  item.kind = ItemKind::Module;
 
   if accept(ctx, TokenKind::LeftCurly)  item.node.module = parse_mod_inner(ctx);
   else {
@@ -651,11 +667,14 @@ fn parse_item(ctx: *ParsingContext) -> *Item {
   return item;
 }
 
-fn parse_mod_inner(ctx: *ParsingContext) -> Mod {
-  var module: Mod;
+fn parse_mod_inner(ctx: *ParsingContext) -> Module {
+  var module: Module;
   module.span.from = span_start(ctx);
   module.items = malloc(8 * 2048);
   module.num_items = 0;
+  module.index_lookup = intmap_create(2048);
+  module.index = malloc(sizeof(IndexEntry) * 2048);
+  module.num_indices = 1;
 
   while !accept(ctx, TokenKind::RightCurly) && !is_done_parsing(ctx) {
     module.items[module.num_items] = parse_item(ctx);
@@ -667,7 +686,7 @@ fn parse_mod_inner(ctx: *ParsingContext) -> Mod {
   return module;
 }
 
-fn parse_mod_external(sess: *Session, ast: *Ast, path: *char) -> Mod {
+fn parse_mod_external(sess: *Session, ast: *Ast, path: *char) -> Module {
 
   var source_file: *SourceFile = source_map_new_file(&sess.source, sess.root_path, path);
 
@@ -682,7 +701,7 @@ fn parse_mod_external(sess: *Session, ast: *Ast, path: *char) -> Mod {
   ctx.sess = sess;
   ctx.ast = ast;
 
-  var module: Mod = parse_mod_inner(&ctx);
+  var module: Module = parse_mod_inner(&ctx);
 
   return module;
 }

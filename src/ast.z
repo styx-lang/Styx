@@ -2,38 +2,68 @@
 struct AstType {}
 struct Expr {}
 struct Block {}
+struct Item {}
 
 struct Ident {
   name: Sid,
+  span: Span,
 }
 
-enum ResKind {
-  Definition,
-  Primitive,
+enum ItemKind {
+  Const,
+  Enum,
+  Function,
+  Module,
+  Struct,
+  Union,
+  Use,
+  Variable,
 }
 
-union ResNode {
-  prim: PrimitiveTy,
+enum BindingKind {
+  Item,
+  Variable,
+  PrimitiveType,
 }
 
-struct Res {
-  kind: ResKind,
-  node: ResNode,
+struct FunctionParameter {}
+
+union BindingNode {
+  item: *Item,
+  slot: u32,
+  primitive: PrimitiveTy,
+}
+
+struct Binding {
+  kind: BindingKind,
+  node: BindingNode,
 }
 
 struct Path {
   segments: *Ident,
   num_segments: u32,
-  res: Res,
+  binding: Binding,
+  span: Span,
+}
+
+struct Pattern {
+  ident: Ident,
   span: Span,
 }
 
 struct Item {}
 
-struct Mod {
+struct IndexEntry {
+  path: Path,
+}
+
+struct Module {
   span: Span,
   items: **Item,
   num_items: u32,
+  index_lookup: *IntMap,
+  index: *IndexEntry,
+  num_indices: u32,
 }
 
 enum AstTypeKind {
@@ -168,6 +198,12 @@ struct AssignmentData {
   right: *Expr,
 }
 
+struct LetData {
+  pat: Pattern,
+  value: *Expr,
+  ty: *AstType,
+}
+
 enum ExprKind {
   Binary,
   Block,
@@ -181,8 +217,7 @@ enum ExprKind {
   Unary,
   While,
   Assignment,
-  Item,
-  Expr,
+  Let,
   Return,
   ControlFlow,
   Defer,
@@ -204,7 +239,7 @@ union ExprKindNode {
   whl: WhileData,
   assignment: AssignmentData,
   _return: *Expr,
-  item: *Item,
+  _let: LetData,
 }
 
 struct Expr {
@@ -249,7 +284,7 @@ struct EnumData {
 }
 
 struct FunctionParameter {
-  ident: Ident,
+  pat: Pattern,
   ty: *AstType,
 }
 
@@ -276,23 +311,12 @@ struct VariableData {
   body: *Expr,
 }
 
-enum ItemKind {
-  Const,
-  Enum,
-  Function,
-  Mod,
-  Struct,
-  Union,
-  Use,
-  Variable,
-}
-
 union ItemKindNode {
   compound: CompoundData,
   _enum: EnumData,
   variable: VariableData,
   function: FunctionData,
-  module: Mod,
+  module: Module,
   _use: UseData,
 }
 
@@ -308,7 +332,7 @@ struct Ast {
   items: *Item,
   num_items: u32,
 
-  root_module: Mod,
+  root_module: Module,
 }
 
 fn ast_create_expr(ast: *Ast, kind: ExprKind) -> *Expr {
