@@ -9,17 +9,6 @@ struct Ident {
   span: Span,
 }
 
-enum ItemKind {
-  Const,
-  Enum,
-  Function,
-  Module,
-  Struct,
-  Union,
-  Use,
-  Variable,
-}
-
 enum BindingKind {
   Item,
   Variable,
@@ -64,6 +53,8 @@ struct Module {
   index_lookup: *IntMap,
   index: *IndexEntry,
   num_indices: u32,
+  path: Path,
+  parent: *Module,
 }
 
 enum AstTypeKind {
@@ -301,9 +292,6 @@ struct FunctionData {
   body: *Expr,
 }
 
-struct UseData {
-  path: Path,
-}
 
 struct VariableData {
   ty: *AstType,
@@ -316,8 +304,19 @@ union ItemKindNode {
   _enum: EnumData,
   variable: VariableData,
   function: FunctionData,
-  module: Module,
-  _use: UseData,
+  module: *Module,
+  _use: Path,
+}
+
+enum ItemKind {
+  Const,
+  Enum,
+  Function,
+  Module,
+  Struct,
+  Union,
+  Use,
+  Variable,
 }
 
 struct Item {
@@ -332,7 +331,7 @@ struct Ast {
   items: *Item,
   num_items: u32,
 
-  root_module: Module,
+  root_module: *Module,
 }
 
 fn ast_create_expr(ast: *Ast, kind: ExprKind) -> *Expr {

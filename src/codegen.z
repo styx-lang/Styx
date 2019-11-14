@@ -371,7 +371,7 @@ fn generate_item(ctx: *CodegenContext, item: *Item) {
   else if item.kind == ItemKind::Enum   generate_enum(ctx, item);
   else if item.kind == ItemKind::Function   generate_function(ctx, item);
   else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  generate_compound(ctx, item);
-  else if item.kind == ItemKind::Module  generate_mod(ctx, &item.node.module);
+  else if item.kind == ItemKind::Module  generate_mod(ctx, item.node.module);
   fprintf(ctx.out, "\n");
 }
 
@@ -386,5 +386,5 @@ fn generate(sess: *Session, ast: Ast, output_file: *char) {
 
   generate_prelude(&ctx);
 
-  generate_mod(&ctx, &ast.root_module);
+  generate_mod(&ctx, ast.root_module);
 }

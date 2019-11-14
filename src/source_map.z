@@ -46,9 +46,7 @@ fn source_map_new_file(self: *SourceMap, path: *char, filename: *char) -> *Sourc
 
   var name_buffer: *char = malloc(needed_length);
 
-  var dot_found: *char = strtok(filename, ".z");
-  if dot_found != null  sprintf(name_buffer, "%s/%s.z", path, filename);
-  else  sprintf(name_buffer, "%s/%s", path, filename);
+  sprintf(name_buffer, "%s/%s.z", path, filename);
 
   file.name = name_buffer;
   file.lines = calloc(sizeof(u32), 4096);

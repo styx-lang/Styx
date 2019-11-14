@@ -5,6 +5,7 @@ struct ParsingContext {
   num_tokens: u64,
   source_map: *SourceMap,
   sess: *Session,
+  current_module: *Module,
   ast: *Ast,
 }
 
@@ -81,7 +82,11 @@ fn parse_path(ctx: *ParsingContext) -> Path {
   path.span.from = span_start(ctx);
 
   while true {
-    path.segments[path.num_segments] = parse_identifier(ctx);
+    if accept(ctx, TokenKind::Star) {
+      path.segments[path.num_segments].name.x = 0;
+    } else {
+      path.segments[path.num_segments] = parse_identifier(ctx);
+    }
     path.num_segments = path.num_segments + 1;
     if !accept(ctx, TokenKind::ColonColon)  break;
   }
@@ -624,13 +629,13 @@ fn parse_use(ctx: *ParsingContext, item: *Item) {
   expect(ctx, TokenKind::Use);
 
   item.kind = ItemKind::Use;
-  item.node._use.path = parse_path(ctx);
+  item.node._use = parse_path(ctx);
 
   accept(ctx, TokenKind::Semicolon);
 }
 
-fn parse_mod_inner(ctx: *ParsingContext) -> Module
-fn parse_mod_external(sess: *Session, ast: *Ast, path: *char) -> Module
+fn parse_mod_inner(ctx: *ParsingContext, name: Ident) -> *Module
+fn parse_mod_external(sess: *Session, ast: *Ast, path: *char, parent: *Module) -> *Module
 
 fn parse_mod(ctx: *ParsingContext, item: *Item) {
   expect(ctx, TokenKind::Mod);
@@ -638,11 +643,11 @@ fn parse_mod(ctx: *ParsingContext, item: *Item) {
   item.ident = parse_identifier(ctx);
   item.kind = ItemKind::Module;
 
-  if accept(ctx, TokenKind::LeftCurly)  item.node.module = parse_mod_inner(ctx);
+  if accept(ctx, TokenKind::LeftCurly)  item.node.module = parse_mod_inner(ctx, item.ident);
   else {
     var sess: *Session = ctx.sess;
     var path: *char = get_str(&sess.interner, item.ident.name);
-    item.node.module = parse_mod_external(ctx.sess, ctx.ast, path);
+    item.node.module = parse_mod_external(ctx.sess, ctx.ast, path, ctx.current_module);
   }
 }
 
@@ -667,14 +672,26 @@ fn parse_item(ctx: *ParsingContext) -> *Item {
   return item;
 }
 
-fn parse_mod_inner(ctx: *ParsingContext) -> Module {
-  var module: Module;
+fn parse_mod_inner(ctx: *ParsingContext, name: Ident) -> *Module {
+  var module: *Module = malloc(sizeof(Module));
   module.span.from = span_start(ctx);
   module.items = malloc(8 * 2048);
   module.num_items = 0;
   module.index_lookup = intmap_create(2048);
   module.index = malloc(sizeof(IndexEntry) * 2048);
   module.num_indices = 1;
+  module.parent = ctx.current_module;
+
+  var parent: *Module = module.parent;
+
+  if parent  module.path.num_segments = parent.path.num_segments + 1;
+  else  module.path.num_segments = 1;
+
+  module.path.segments = malloc(sizeof(Ident) * module.path.num_segments);
+  if parent  memcpy(module.path.segments, parent.path.segments, parent.path.num_segments * sizeof(Ident));
+  module.path.segments[module.path.num_segments - 1] = name;
+
+  ctx.current_module = module;
 
   while !accept(ctx, TokenKind::RightCurly) && !is_done_parsing(ctx) {
     module.items[module.num_items] = parse_item(ctx);
@@ -683,10 +700,12 @@ fn parse_mod_inner(ctx: *ParsingContext) -> Module {
 
   module.span.to = span_end(ctx);
 
+  ctx.current_module = module.parent;
+
   return module;
 }
 
-fn parse_mod_external(sess: *Session, ast: *Ast, path: *char) -> Module {
+fn parse_mod_external(sess: *Session, ast: *Ast, path: *char, parent: *Module) -> *Module {
 
   var source_file: *SourceFile = source_map_new_file(&sess.source, sess.root_path, path);
 
@@ -700,8 +719,37 @@ fn parse_mod_external(sess: *Session, ast: *Ast, path: *char) -> Module {
   ctx.source_map = &sess.source;
   ctx.sess = sess;
   ctx.ast = ast;
+  ctx.current_module = parent;
 
-  var module: Module = parse_mod_inner(&ctx);
+  var name_ident: Ident;
+  name_ident.name = intern(&sess.interner, path);
+  name_ident.span.from = 0;
+  name_ident.span.to = 0;
+
+  var module: *Module = parse_mod_inner(&ctx, name_ident);
+
+  return module;
+}
+
+fn create_root_module(sess: *Session, ast: *Ast, path: *char) -> *Module {
+
+  var module: *Module = malloc(sizeof(Module));
+  module.items = malloc(8 * 2048);
+  module.index_lookup = intmap_create(2048);
+  module.index = malloc(sizeof(IndexEntry) * 2048);
+  module.num_indices = 1;
+  module.parent = null;
+
+  var main_item: *Item = ast_create_item(ast);
+  main_item.kind = ItemKind::Module;
+  main_item.ident.name = intern(&sess.interner, path);
+
+  var main_module: *Module = parse_mod_external(sess, ast, path, module);;
+  main_item.span.from = main_module.span.from;
+  main_item.span.to = main_module.span.to;
+  main_item.node.module = main_module;
+  module.items[0] = main_item;
+  module.num_items = 1;
 
   return module;
 }
@@ -713,7 +761,7 @@ fn parse(sess: *Session, root_module_name: *char) -> Ast {
   ast.items = malloc(sizeof(Item) * 2048);
   ast.num_items = 1; //Reserve zero idx for null item
 
-  ast.root_module = parse_mod_external(sess, &ast, root_module_name);
+  ast.root_module = create_root_module(sess, &ast, root_module_name);
 
   return ast;
 }
