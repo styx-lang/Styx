@@ -1,4 +1,8 @@
 
-fn B() {
-  printf("B\n");
+fn B1() {
+  printf("B1\n");
+}
+
+fn B2() {
+  printf("B2\n");
 }

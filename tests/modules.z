@@ -11,13 +11,14 @@ mod module_b;
 mod module_c;
 
 use self::module_a::A;
-use self::module_b::B;
+use self::module_b::*;
 use self::module_c::C;
 use self::module_c::module_c_a::C_A;
 
 fn main() {
   A();
-  B();
+  B1();
+  B2();
   C();
   C_A();
 }

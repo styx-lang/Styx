@@ -153,7 +153,7 @@ fn index_use_binding(ctx: *ResolutionContext, path: Path) -> Binding {
         }
         else if i != path.num_segments - 1  emit_error(ctx.source_map, path.span, "Invalid path in use");
 
-        if i == path.num_segments - 1  {
+        if i == path.num_segments - 1 || path.segments[i+1].name.x == 0 {
           var binding: Binding;
           binding.kind = BindingKind::Item;
           binding.node.item = item;
@@ -180,7 +180,6 @@ fn absolute_use(ctx: *ResolutionContext, module: *Module, item: *Item) {
     *p = abs;
   }
   else if p.segments[0].name.x == intern(ctx.interner, "super").x {
-    //module.parent.path + p[1..]
     var parent: *Module = module.parent;
     abs.num_segments = parent.path.num_segments + p.num_segments - 1;
     abs.segments = malloc(sizeof(Ident) * abs.num_segments);
@@ -197,11 +196,7 @@ fn index_use(ctx: *ResolutionContext, module: *Module) {
     if item.kind == ItemKind::Use {
       absolute_use(ctx, module, item);
       var path: *Path = &item.node._use;
-      if !path.segments[path.num_segments-1].name.x != 0 {
-        abort(); //TODO
-      } else {
-        path.binding = index_use_binding(ctx, *path);
-      }
+      path.binding = index_use_binding(ctx, *path);
     }
 
     if item.kind == ItemKind::Module {
@@ -216,10 +211,11 @@ fn add_item(ctx: *ResolutionContext, module: *Module, item: *Item) {
 
   var idx_entry: *IndexEntry = &module.index[module.num_indices];
 
-  idx_entry.path.num_segments = (module.path.num_segments + 1);
+
+  idx_entry.path.num_segments = 1;//(module.path.num_segments + 1);
   idx_entry.path.segments = malloc(sizeof(Ident) * idx_entry.path.num_segments);
-  memcpy(idx_entry.path.segments, module.path.segments, sizeof(Ident) * module.path.num_segments);
-  idx_entry.path.segments[module.path.num_segments] = item.ident;
+  //memcpy(idx_entry.path.segments, module.path.segments, sizeof(Ident) * module.path.num_segments);
+  idx_entry.path.segments[0] = item.ident;
   idx_entry.path.binding.kind = BindingKind::Item;
   idx_entry.path.binding.node.item = item;
 
@@ -238,7 +234,6 @@ fn index_module(ctx: *ResolutionContext, module: *Module) {
 
       if path.segments[path.num_segments-1].name.x != 0 {
         add_item(ctx, module, path.binding.node.item);
-      } else {
       }
     } else {
       add_item(ctx, module, item);
@@ -254,17 +249,34 @@ fn index_module(ctx: *ResolutionContext, module: *Module) {
   }
 }
 
-fn index_module_wildcard(ctx: *ResolutionContext, module: *Module) {
+fn index_module_wildcards(ctx: *ResolutionContext, module: *Module) {
   var i: u32 = 0;
   while i < module.num_items {
     var item: *Item = module.items[i];
 
     if item.kind == ItemKind::Use {
       var path: Path = item.node._use;
-      if !path.segments[path.num_segments-1].name.x == 0 {
-
+      if path.segments[path.num_segments-1].name.x == 0 {
+         var bound: *Item = path.binding.node.item;
+         if bound.kind == ItemKind::Module {
+           var m: *Module = bound.node.module;
+           var j: u32 = 0;
+           while j < m.num_items {
+             var it: *Item = m.items[j];
+             add_item(ctx, module, it);
+             j = j + 1;
+           }
+         }
+         else  abort();
       }
     }
+    i = i + 1;
+  }
+
+  i = 0;
+  while i < module.num_items {
+    var item: *Item = module.items[i];
+    if item.kind == ItemKind::Module  index_module_wildcards(ctx, item.node.module);
     i = i + 1;
   }
 }
@@ -447,5 +459,6 @@ fn resolve(sess: *Session, ast: *Ast) {
 
   index_use(&ctx, ast.root_module);
   index_module(&ctx, ast.root_module);
+  index_module_wildcards(&ctx, ast.root_module);
   resolve_module(&ctx, ast.root_module);
 }
