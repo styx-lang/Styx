@@ -12,6 +12,8 @@ struct CodegenContext {
   sess: *Session,
   ast: *Ast,
   source: *SourceMap,
+  current_module: *Module,
+  interner: *Interner,
 }
 
 fn generate_expr(ctx: *CodegenContext, expr: *Expr)
@@ -41,8 +43,7 @@ fn generate_prelude(ctx: *CodegenContext) {
 }
 
 fn generate_sid(ctx: *CodegenContext, sid: Sid) {
-  var sess: *Session = ctx.sess;
-  fprintf(ctx.out, "%s",  get_str(&sess.interner, sid));
+  fprintf(ctx.out, "%s",  get_str(ctx.interner, sid));
 }
 
 fn generate_identifier(ctx: *CodegenContext, ident: Ident) {
@@ -53,8 +54,45 @@ fn generate_pattern(ctx: *CodegenContext, pat: Pattern) {
   generate_identifier(ctx, pat.ident);
 }
 
+fn mangle_path(ctx: *CodegenContext, path: Path) {
+  val item: *Item = path.binding.node.item;
+  if (path.binding.kind == BindingKind::Item && item.should_mangle) {
+    fprintf(ctx.out, "_ZN");
+    var i: u32 = 0;
+    while i < path.num_segments {
+      var seg: *char = get_str(ctx.interner, path.segments[i].name);
+      fprintf(ctx.out, "%lu%s", strlen(seg), seg);
+      i = i + 1;
+    }
+    fprintf(ctx.out, "E");
+  } else if path.binding.kind == BindingKind::Variant {
+    fprintf(ctx.out, "%s_%s", get_str(ctx.interner, path.segments[path.num_segments-2].name), get_str(ctx.interner, path.segments[path.num_segments-1].name));
+  }
+  else {
+    fprintf(ctx.out, "%s", get_str(ctx.interner, path.segments[path.num_segments-1].name));
+  }
+}
+
+fn mangle_path_and_ident(ctx: *CodegenContext, path: Path, ident: Ident) {
+  fprintf(ctx.out, " _ZN");
+  var i: u32 = 0;
+  while i < path.num_segments {
+    var seg: *char = get_str(ctx.interner, path.segments[i].name);
+    fprintf(ctx.out, "%lu%s", strlen(seg), seg);
+    i = i + 1;
+  }
+  var name: *char = get_str(ctx.interner, ident.name);
+  fprintf(ctx.out, "%lu%sE", strlen(name), name);
+}
+
+fn mangle_function_name(ctx: *CodegenContext, module: *Module, ident: Ident, header: FunctionHeader) {
+  mangle_path_and_ident(ctx, module.path, ident);
+}
+
 fn generate_type(ctx: *CodegenContext, ty: *AstType) {
-  if ty.kind == AstTypeKind::Path  generate_sid(ctx, ty.node.path);
+  if ty.kind == AstTypeKind::Path {
+    mangle_path(ctx, ty.node.path);
+  }
   else if ty.kind == AstTypeKind::Ptr {
     generate_type(ctx, ty.node.ptr);
     fprintf(ctx.out, "* ");
@@ -79,8 +117,7 @@ fn generate_literal(ctx: *CodegenContext, lit: Literal) {
   else if lit.kind == LiteralKind::Float  fprintf(ctx.out, "%f", lit.value.floating);
   else if lit.kind == LiteralKind::Bool  if lit.value.boolean  fprintf(ctx.out, "true") else fprintf(ctx.out, "false");
   else if lit.kind == LiteralKind::Str  {
-    var sess: *Session = ctx.sess;
-    fprintf(ctx.out, "\"%s\"",  get_str(&sess.interner, lit.value.str));
+    fprintf(ctx.out, "\"%s\"",  get_str(ctx.interner, lit.value.str));
   }
   else if lit.kind == LiteralKind::Char  generate_char(ctx, lit.value.ch);
   else abort();
@@ -168,28 +205,18 @@ fn generate_field(ctx: *CodegenContext, field: FieldData) {
   var strct: *Expr = field.strct;
   generate_expr(ctx, strct);
 
-  var sess: *Session = ctx.sess;
-  var field_name: *char = get_str(&sess.interner, field.ident.name)
+  var field_name: *char = get_str(ctx.interner, field.ident.name)
 
   var is_ptr: bool = false;
   var accessor_str: *char;
   if strct.kind == ExprKind::Path {
-    var strct_name: *char = get_str(&sess.interner, strct.node.path.segments[0].name)
+    var strct_name: *char = get_str(ctx.interner, strct.node.path.segments[0].name)
     is_ptr = strmap_lookup(ctx.ident_is_ptr, strct_name);
   }
 
   if is_ptr  accessor_str = "->";
   else  accessor_str = ".";
   fprintf(ctx.out, "%s%s", accessor_str, field_name);
-}
-
-fn generate_path(ctx: *CodegenContext, path: Path) {
-  var i: u32 = 0;
-  while i < path.num_segments {
-    generate_identifier(ctx, path.segments[i]);
-    if i < path.num_segments - 1  fprintf(ctx.out, "_");
-    i = i + 1;
-  }
 }
 
 fn generate_sizeof(ctx: *CodegenContext, expr: *Expr) {
@@ -220,8 +247,7 @@ fn generate_let(ctx: *CodegenContext, data: LetData) {
 
   generate_type(ctx, data.ty);
 
-  var sess: *Session = ctx.sess;
-  var var_name: *char = get_str(&sess.interner, data.pat.ident.name);
+  var var_name: *char = get_str(ctx.interner, data.pat.ident.name);
 
   strmap_insert(ctx.ident_is_ptr, var_name, type_is_ptr(data.ty));
   fprintf(ctx.out, " %s ", var_name);
@@ -242,7 +268,7 @@ fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
    else if expr.kind == ExprKind::Indexing  generate_indexing(ctx, expr.node.indexing);
    else if expr.kind == ExprKind::Field  generate_field(ctx, expr.node.field);
    else if expr.kind == ExprKind::Literal  generate_literal(ctx, expr.node.lit);
-   else if expr.kind == ExprKind::Path  generate_path(ctx, expr.node.path);
+   else if expr.kind == ExprKind::Path  mangle_path(ctx, expr.node.path);
    else if expr.kind == ExprKind::Sizeof  generate_sizeof(ctx, expr.node._sizeof);
    else if expr.kind == ExprKind::Assignment generate_assignment(ctx, expr.node.assignment);
    else if expr.kind == ExprKind::ControlFlow  generate_control_flow(ctx, expr.node.control_flow_is_continue);
@@ -271,11 +297,12 @@ fn generate_variable(ctx: *CodegenContext, item: *Item) {
 
   generate_type(ctx, item.node.variable.ty);
 
-  var sess: *Session = ctx.sess;
-  var var_name: *char = get_str(&sess.interner, item.ident.name);
+  var var_name: *char = get_str(ctx.interner, item.ident.name);
+
+  val module: *Module = ctx.current_module;
 
   strmap_insert(ctx.ident_is_ptr, var_name, type_is_ptr(item.node.variable.ty));
-  fprintf(ctx.out, " %s ", var_name);
+  mangle_path_and_ident(ctx, module.path, item.ident);
   if item.node.variable.body {
     fprintf(ctx.out, "= ");
     generate_expr(ctx, item.node.variable.body);
@@ -291,10 +318,9 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
   val header: FunctionHeader = func.header;
   generate_type(ctx, header.output);
 
-  var sess: *Session = ctx.sess;
-  var func_name: *char = get_str(&sess.interner, item.ident.name);
-
-  fprintf(ctx.out, " %s(", func_name);
+  if item.should_mangle  mangle_function_name(ctx, ctx.current_module, item.ident, header);
+  else  fprintf(ctx.out, " %s", get_str(ctx.interner, item.ident.name));
+  fprintf(ctx.out, "(");
 
   var i: u32 = 0;
   while i < header.num_parameters {
@@ -306,7 +332,7 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 
     generate_type(ctx, ty);
 
-    var param_name: *char = get_str(&sess.interner, header.parameters[i].pat.ident.name);
+    var param_name: *char = get_str(ctx.interner, header.parameters[i].pat.ident.name);
     strmap_insert(ctx.ident_is_ptr, param_name, type_is_ptr(header.parameters[i].ty));
     fprintf(ctx.out, " %s", param_name);
     if i < header.num_parameters - 1  fprintf(ctx.out, ", ");
@@ -319,27 +345,28 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 
 fn generate_enum(ctx: *CodegenContext, item: *Item) {
 
-  var sess: *Session = ctx.sess;
-  var enum_name: *char = get_str(&sess.interner, item.ident.name);
+  var enum_name: *char = get_str(ctx.interner, item.ident.name);
+  val module: *Module = ctx.current_module;
 
   emit_line_directive(ctx.out, ctx.source, item.span);
-  fprintf(ctx.out, "typedef enum %s {\n", enum_name);
+  fprintf(ctx.out, "typedef enum");
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  fprintf(ctx.out, " {\n");
   var i: u32 = 0;
 
   val data: EnumData = item.node._enum;
 
   while i < data.num_variants {
-    var variant_name: *char = get_str(&sess.interner, data.variants[i].ident.name);
+    var variant_name: *char = get_str(ctx.interner, data.variants[i].ident.name);
     fprintf(ctx.out, "%s_%s,\n", enum_name, variant_name);
     i = i + 1;
   }
-  fprintf(ctx.out, "} %s;\n\n", enum_name);
+  fprintf(ctx.out, "}");
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  fprintf(ctx.out, ";\n\n");
 }
 
 fn generate_compound(ctx: *CodegenContext, item: *Item) {
-
-  var sess: *Session = ctx.sess;
-  var compound_name: *char = get_str(&sess.interner, item.ident.name);
 
   var compound_kind: *char;
   if item.kind == ItemKind::Struct  compound_kind = "struct";
@@ -347,29 +374,41 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
 
   val data: CompoundData = item.node.compound;
 
-  fprintf(ctx.out, "typedef %s %s %s;\n", compound_kind, compound_name, compound_name);
+  val module: *Module = ctx.current_module;
+
+  fprintf(ctx.out, "typedef %s", compound_kind);
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  fprintf(ctx.out, ";\n");
 
   emit_line_directive(ctx.out, ctx.source, item.span);
   if data.num_fields > 0 {
-    fprintf(ctx.out, "typedef %s %s {\n", compound_kind, compound_name);
+    fprintf(ctx.out, "typedef %s", compound_kind);
+    mangle_path_and_ident(ctx, module.path, item.ident);
+    fprintf(ctx.out, " {\n");
     var i: u32 = 0;
     while i < data.num_fields {
       generate_type(ctx, data.fields[i].ty);
 
-      var field_name: *char = get_str(&sess.interner, data.fields[i].ident.name);
+      var field_name: *char = get_str(ctx.interner, data.fields[i].ident.name);
       fprintf(ctx.out, " %s;\n", field_name);
       i = i + 1;
     }
-    fprintf(ctx.out, "} %s;\n\n", compound_name);
+    fprintf(ctx.out, "}");
+    mangle_path_and_ident(ctx, module.path, item.ident);
+    fprintf(ctx.out, ";\n\n");
   }
 }
 
 fn generate_mod(ctx: *CodegenContext, module: *Module) {
+  var old_module: *Module = ctx.current_module;
+  ctx.current_module = module;
   var i: u32 = 0;
   while i < module.num_items {
     generate_item(ctx, module.items[i]);
     i = i + 1;
   }
+  ctx.current_module = old_module;
 }
 
 fn generate_item(ctx: *CodegenContext, item: *Item) {
@@ -388,6 +427,7 @@ fn generate(sess: *Session, ast: Ast, output_file: *char) {
   ctx.out = fopen(output_file, "w");
   ctx.ident_is_ptr = strmap_create(1024);
   ctx.sess = sess;
+  ctx.interner = &sess.interner;
   ctx.source = &sess.source;
   ctx.ast = &ast;
 

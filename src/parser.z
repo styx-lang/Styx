@@ -122,14 +122,16 @@ fn parse_type(ctx: *ParsingContext) -> *AstType {
   var node: AstTypeKindNode;
   var kind: AstTypeKind;
 
-  val token: Token = consume(ctx);
+  val token: Token = look_ahead(ctx, 0);
   if token.kind == TokenKind::Identifier {
     kind = AstTypeKind::Path;
-    node.path = token.lexeme; //parse_path(ctx, token);
+    node.path = parse_path(ctx);
   } else if token.kind == TokenKind::Star {
+    expect(ctx, TokenKind::Star);
     kind = AstTypeKind::Ptr;
     node.ptr = parse_type(ctx);
   } else if token.kind == TokenKind::Ellipsis {
+    expect(ctx, TokenKind::Ellipsis);
     kind = AstTypeKind::Variadic;
   }
   else  emit_error(ctx.source_map, token.span, "Expected type");
@@ -625,11 +627,13 @@ fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
 fn parse_function_decl(ctx: *ParsingContext, item: *Item) {
 
   item.kind = ItemKind::Function;
-  item.node.function.is_extern = accept(ctx, TokenKind::Extern);
 
   expect(ctx, TokenKind::Fn);
 
   item.ident = parse_identifier(ctx);
+
+  var sess: *Session = ctx.sess;
+  if item.ident.name.x == intern(&sess.interner, "main").x  item.should_mangle = false;
 
   item.node.function.header = parse_function_header(ctx);
 
@@ -665,12 +669,14 @@ fn parse_mod(ctx: *ParsingContext, item: *Item) {
 
 
 fn parse_item(ctx: *ParsingContext) -> *Item {
-  val tok : Token = look_ahead(ctx, 0);
 
   var item: *Item = ast_create_item(ctx.ast);
   item.span.from = span_start(ctx);
+  item.should_mangle = !accept(ctx, TokenKind::Extern);
 
-  if tok.kind == TokenKind::Fn || tok.kind == TokenKind::Extern  parse_function_decl(ctx, item);
+  val tok : Token = look_ahead(ctx, 0);
+  
+  if tok.kind == TokenKind::Fn   parse_function_decl(ctx, item);
   else if tok.kind == TokenKind::Struct || tok.kind == TokenKind::Union  parse_compound_decl(ctx, item);
   else if tok.kind == TokenKind::Enum  parse_enum_decl(ctx, item);
   else if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  parse_variable_decl(ctx, item);

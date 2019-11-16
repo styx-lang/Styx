@@ -33,8 +33,10 @@ struct Scope {
 
 struct PrimitiveTypeSids {
   _void: Sid,
+  _constvoid: Sid,
   _bool: Sid,
   _char: Sid,
+  _constchar: Sid,
   _i8: Sid,
   _i16: Sid,
   _i32: Sid,
@@ -49,8 +51,10 @@ struct PrimitiveTypeSids {
 
 fn setup_primitive_ty_sids(i: *Interner, p: *PrimitiveTypeSids) {
   p._void = intern(i, "void");
+  p._constvoid = intern(i, "constvoid");
   p._bool = intern(i, "bool");
   p._char = intern(i, "char");
+  p._constchar = intern(i, "constchar");
   p._i8 = intern(i, "i8");
   p._i16 = intern(i, "i16");
   p._i32 = intern(i, "i32");
@@ -216,17 +220,30 @@ fn index_use(ctx: *ResolutionContext, module: *Module) {
   }
 }
 
-fn add_item(ctx: *ResolutionContext, module: *Module, item: *Item) {
+fn add_item(ctx: *ResolutionContext, module: *Module, parent: *Module, item: *Item) {
 
   var idx_entry: *IndexEntry = &module.index[module.num_indices];
 
 
-  idx_entry.path.num_segments = 1;//(module.path.num_segments + 1);
+  idx_entry.path.num_segments = parent.path.num_segments + 1;
   idx_entry.path.segments = malloc(sizeof(Ident) * idx_entry.path.num_segments);
-  //memcpy(idx_entry.path.segments, module.path.segments, sizeof(Ident) * module.path.num_segments);
-  idx_entry.path.segments[0] = item.ident;
+  memcpy(idx_entry.path.segments, parent.path.segments, sizeof(Ident) * parent.path.num_segments);
+  idx_entry.path.segments[parent.path.num_segments] = item.ident;
   idx_entry.path.binding.kind = BindingKind::Item;
   idx_entry.path.binding.node.item = item;
+
+  intmap_insert(module.index_lookup, item.ident.name.x, module.num_indices);
+
+  module.num_indices = module.num_indices + 1;
+}
+
+
+fn add_absolute_item(ctx: *ResolutionContext, module: *Module, path: Path, item: *Item) {
+
+  var idx_entry: *IndexEntry = &module.index[module.num_indices];
+
+
+  idx_entry.path = path;
 
   intmap_insert(module.index_lookup, item.ident.name.x, module.num_indices);
 
@@ -242,10 +259,10 @@ fn index_module(ctx: *ResolutionContext, module: *Module) {
       var path: Path = item.node._use;
 
       if path.segments[path.num_segments-1].name.x != 0 {
-        add_item(ctx, module, path.binding.node.item);
+        add_absolute_item(ctx, module, path, path.binding.node.item);
       }
     } else {
-      add_item(ctx, module, item);
+      add_item(ctx, module, module, item);
     }
     i = i + 1;
   }
@@ -272,7 +289,7 @@ fn index_module_wildcards(ctx: *ResolutionContext, module: *Module) {
            var j: u32 = 0;
            while j < m.num_items {
              var it: *Item = m.items[j];
-             add_item(ctx, module, it);
+             add_item(ctx, module, m, it);
              j = j + 1;
            }
          }
@@ -294,8 +311,10 @@ fn check_if_sid_is_primitive(ctx: *ResolutionContext, s: Sid, prim: *PrimitiveTy
 
   val p: *PrimitiveTypeSids = &ctx.primitive_ty_sids;
   if s.x == p._void.x  prim.kind = PrimitiveTyKind::Void;
+  else if s.x == p._constvoid.x  prim.kind = PrimitiveTyKind::ConstVoid;
   else if s.x == p._bool.x  prim.kind = PrimitiveTyKind::Bool;
   else if s.x == p._char.x  prim.kind = PrimitiveTyKind::Char;
+  else if s.x == p._constchar.x  prim.kind = PrimitiveTyKind::ConstChar;
 
   else if s.x == p._i8.x { prim.kind = PrimitiveTyKind::Signed; prim.node.integer = IntegerSize::I8; }
   else if s.x == p._i16.x { prim.kind = PrimitiveTyKind::Signed; prim.node.integer = IntegerSize::I16; }
@@ -361,6 +380,15 @@ fn resolve_path(ctx: *ResolutionContext, path: *Path) {
   }
 }
 
+fn resolve_type(ctx: *ResolutionContext, ty: *AstType) {
+  if ty.kind == AstTypeKind::Ptr {
+    resolve_type(ctx, ty.node.ptr);
+  }
+  else if ty.kind == AstTypeKind::Path {
+    resolve_path(ctx, &ty.node.path);
+  }
+}
+
 fn resolve_expr(ctx: *ResolutionContext, expr: *Expr)
 fn resolve_item(ctx: *ResolutionContext, item: *Item)
 
@@ -423,6 +451,7 @@ fn resolve_block(ctx: *ResolutionContext, block: *Block) {
 
 fn resolve_let(ctx: *ResolutionContext, data: LetData) {
   push_variable(ctx, data.pat.ident);
+  resolve_type(ctx, data.ty);
   if data.value  resolve_expr(ctx, data.value);
 }
 
@@ -451,6 +480,15 @@ fn resolve_expr(ctx: *ResolutionContext, expr: *Expr) {
 
 fn resolve_function(ctx: *ResolutionContext, item: *Item) {
   var func: FunctionData = item.node.function;
+
+  resolve_type(ctx, func.header.output);
+  var i: u32 = 0;
+  while i < func.header.num_parameters {
+    var param: *FunctionParameter = &func.header.parameters[i];
+    resolve_type(ctx, param.ty);
+    i = i + 1;
+  }
+
   if func.body {
     push_block(ctx);
     var i: u32 = 0;
@@ -474,11 +512,23 @@ fn resolve_variable(ctx: *ResolutionContext, item: *Item) {
   pop_block(ctx);
 }
 
+fn resolve_compound(ctx: *ResolutionContext, item: *Item) {
+
+  var data: CompoundData = item.node.compound;
+
+  var i: u32 = 0;
+  while i <  data.num_fields {
+    resolve_type(ctx, data.fields[i].ty);
+    i = i + 1;
+  }
+}
+
 fn resolve_module(ctx: *ResolutionContext, module: *Module);
 
 fn resolve_item(ctx: *ResolutionContext, item: *Item) {
   if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  resolve_variable(ctx, item);
   if item.kind == ItemKind::Function  resolve_function(ctx, item);
+  if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  resolve_compound(ctx, item);
   if item.kind == ItemKind::Module  resolve_module(ctx, item.node.module);
 }
 

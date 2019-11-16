@@ -23,10 +23,10 @@ use self::parser::parse;
 use self::resolution::resolve;
 use self::codegen::generate;
 
-fn basename(path: *char) -> *char
-fn dirname(path: *char) -> *char
+extern fn basename(path: *char) -> *char
+extern fn dirname(path: *char) -> *char
 
-fn main(argc: int, argv: **char) -> int {
+fn main(argc: i32, argv: **char) -> i32 {
   if argc != 3 {
     printf("Usage: compiler INPUT OUTPUT\n");
     abort();

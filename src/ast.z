@@ -1,6 +1,9 @@
 use super::cstd::*;
+use super::intmap::IntMap;
 use super::source_map::*;
+use super::interning::Sid;
 use super::error::*;
+use super::types::*;
 
 struct AstType {}
 struct Expr {}
@@ -81,7 +84,7 @@ struct Generics {
 }
 
 union AstTypeKindNode {
-  path: Sid,
+  path: Path,
   ptr: *AstType,
 }
 
@@ -296,7 +299,6 @@ struct FunctionHeader {
 struct FunctionData {
   header: FunctionHeader,
   body: *Expr,
-  is_extern: bool,
 }
 
 
@@ -332,6 +334,7 @@ struct Item {
   node: ItemKindNode,
   vis: Visibility,
   span: Span,
+  should_mangle: bool,
 }
 
 struct Ast {
