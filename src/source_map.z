@@ -1,3 +1,5 @@
+use super::cstd::*;
+
 struct Span {
   from: u32,
   to: u32,

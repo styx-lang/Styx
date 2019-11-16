@@ -1,4 +1,6 @@
 
+use super::cstd::*;
+
 struct StrMap {
   keys: **char,
   values: *u32,

@@ -1,3 +1,11 @@
+use super::cstd::*;
+use super::intmap::*;
+use super::interning::*;
+use super::source_map::*;
+use super::error::*;
+use super::ast::*;
+use super::types::*;
+
 struct VariableInfo {
   ident: Ident,
   slot: u32,
@@ -161,6 +169,7 @@ fn index_use_binding(ctx: *ResolutionContext, path: Path) -> Binding {
         }
 
         found = true;
+        break;
       }
       j = j + 1;
     }
@@ -313,7 +322,40 @@ fn resolve_path(ctx: *ResolutionContext, path: *Path) {
     path.binding.kind = BindingKind::PrimitiveType;
     path.binding.node.primitive = prim;
   }
-  else if path.num_segments > 1  abort();
+  else if path.num_segments > 1  {
+    var base_path: Path = lookup(ctx, path.segments[0]);
+    if base_path.binding.kind == BindingKind::Item {
+      var item: *Item = base_path.binding.node.item;
+
+      if item.kind == ItemKind::Enum {
+
+        var p: Path;
+        p.num_segments = base_path.num_segments + 1;
+        p.segments = malloc(sizeof(Ident) * p.num_segments);
+        memcpy(p.segments, base_path.segments, base_path.num_segments * sizeof(Ident));
+
+
+        var i: u32 = 0;
+        var data: EnumData = item.node._enum;
+        var found: bool = false;
+        while i < data.num_variants {
+          if data.variants[i].ident.name.x == path.segments[1].name.x {
+            p.segments[base_path.num_segments] = data.variants[i].ident;
+            p.binding.kind = BindingKind::Variant;
+            p.binding.node.variant = &data.variants[i];
+            found = true;
+            break;
+          }
+          i = i + 1;
+        }
+        if !found  emit_error(ctx.source_map, path.span, "Enum does not have requested variant");
+        ;
+        *path = p;
+      }
+      else abort(); //TODO
+    }
+    else  abort();
+  }
   else if path.num_segments == 1 {
     *path = lookup(ctx, path.segments[0]);
   }
@@ -381,7 +423,11 @@ fn resolve_block(ctx: *ResolutionContext, block: *Block) {
 
 fn resolve_let(ctx: *ResolutionContext, data: LetData) {
   push_variable(ctx, data.pat.ident);
-  resolve_expr(ctx, data.value);
+  if data.value  resolve_expr(ctx, data.value);
+}
+
+fn resolve_sizeof(ctx: *ResolutionContext, expr: *Expr) {
+  resolve_expr(ctx, expr);
 }
 
 fn resolve_expr(ctx: *ResolutionContext, expr: *Expr) {
@@ -399,6 +445,7 @@ fn resolve_expr(ctx: *ResolutionContext, expr: *Expr) {
   else if expr.kind == ExprKind::Return  resolve_expr(ctx, expr.node._return);
   else if expr.kind == ExprKind::Literal {}
   else if expr.kind == ExprKind::ControlFlow  {}
+  else if expr.kind == ExprKind::Sizeof  resolve_sizeof(ctx, expr.node._sizeof);
   else abort();
 }
 

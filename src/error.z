@@ -1,3 +1,5 @@
+use super::cstd::*;
+use super::source_map::*;
 
 fn emit_error(m: *SourceMap, span: Span, msg: *char) {
   printf("error: %s\n", msg);

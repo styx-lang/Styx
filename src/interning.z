@@ -1,3 +1,5 @@
+use super::cstd::*;
+use super::strmap::*;
 
 struct Sid {
   x: u32,

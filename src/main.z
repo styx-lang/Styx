@@ -14,6 +14,15 @@ mod parser;
 mod resolution;
 mod codegen;
 
+use self::cstd::*;
+use self::session::Session;
+use self::interning::interner_create;
+use self::source_map::source_map_create;
+use self::ast::Ast;
+use self::parser::parse;
+use self::resolution::resolve;
+use self::codegen::generate;
+
 fn basename(path: *char) -> *char
 fn dirname(path: *char) -> *char
 
@@ -43,7 +52,7 @@ fn main(argc: int, argv: **char) -> int {
 
   val ast: Ast = parse(&sess, root_module);
 
-  //resolve(&sess, &ast);
+  resolve(&sess, &ast);
   //check(&sess, &ast);
   generate(&sess, ast, argv[2]);
 

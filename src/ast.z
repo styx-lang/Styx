@@ -1,3 +1,6 @@
+use super::cstd::*;
+use super::source_map::*;
+use super::error::*;
 
 struct AstType {}
 struct Expr {}
@@ -13,14 +16,17 @@ enum BindingKind {
   Item,
   Variable,
   PrimitiveType,
+  Variant,
 }
 
 struct FunctionParameter {}
+struct EnumVariant {}
 
 union BindingNode {
   item: *Item,
   slot: u32,
   primitive: PrimitiveTy,
+  variant: *EnumVariant,
 }
 
 struct Binding {

@@ -1,4 +1,6 @@
 
+use super::cstd::*;
+
 struct IntMap {
   keys: *u64,
   values: *u64,
