@@ -614,10 +614,13 @@ fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
 }
 
 fn parse_function_decl(ctx: *ParsingContext, item: *Item) {
+
+  item.kind = ItemKind::Function;
+  item.node.function.is_extern = accept(ctx, TokenKind::Extern);
+
   expect(ctx, TokenKind::Fn);
 
   item.ident = parse_identifier(ctx);
-  item.kind = ItemKind::Function;
 
   item.node.function.header = parse_function_header(ctx);
 
@@ -658,7 +661,7 @@ fn parse_item(ctx: *ParsingContext) -> *Item {
   var item: *Item = ast_create_item(ctx.ast);
   item.span.from = span_start(ctx);
 
-  if tok.kind == TokenKind::Fn  parse_function_decl(ctx, item);
+  if tok.kind == TokenKind::Fn || tok.kind == TokenKind::Extern  parse_function_decl(ctx, item);
   else if tok.kind == TokenKind::Struct || tok.kind == TokenKind::Union  parse_compound_decl(ctx, item);
   else if tok.kind == TokenKind::Enum  parse_enum_decl(ctx, item);
   else if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  parse_variable_decl(ctx, item);

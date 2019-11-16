@@ -95,6 +95,7 @@ fn is_keyword(s: *char) -> TokenKind {
   if !strcmp(s, "const")  return TokenKind::Continue;
   if !strcmp(s, "defer")  return TokenKind::Defer;
   if !strcmp(s, "enum")  return TokenKind::Enum;
+  if !strcmp(s, "extern")  return TokenKind::Extern;
   if !strcmp(s, "else")  return TokenKind::Else;
   if !strcmp(s, "false")  return TokenKind::False;
   if !strcmp(s, "fn")  return TokenKind::Fn;

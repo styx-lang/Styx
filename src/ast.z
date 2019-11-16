@@ -290,6 +290,7 @@ struct FunctionHeader {
 struct FunctionData {
   header: FunctionHeader,
   body: *Expr,
+  is_extern: bool,
 }
 
 

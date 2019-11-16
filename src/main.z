@@ -43,7 +43,7 @@ fn main(argc: int, argv: **char) -> int {
 
   val ast: Ast = parse(&sess, root_module);
 
-  resolve(&sess, &ast);
+  //resolve(&sess, &ast);
   //check(&sess, &ast);
   generate(&sess, ast, argv[2]);
 

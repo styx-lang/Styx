@@ -12,6 +12,7 @@ enum TokenKind {
     Defer,
     Enum,
     Else,
+    Extern,
     Fn,
     For,
     If,
