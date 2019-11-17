@@ -8,10 +8,10 @@ mod interning;
 mod session;
 mod tokens;
 mod lexer;
-mod types;
 mod ast;
 mod parser;
 mod resolution;
+mod typecheck;
 mod codegen;
 
 use self::cstd::*;
@@ -21,6 +21,7 @@ use self::source_map::source_map_create;
 use self::ast::Ast;
 use self::parser::parse;
 use self::resolution::resolve;
+use self::typecheck::check;
 use self::codegen::generate;
 
 extern fn basename(path: *char) -> *char

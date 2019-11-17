@@ -4,7 +4,6 @@ use super::interning::*;
 use super::source_map::*;
 use super::error::*;
 use super::ast::*;
-use super::types::*;
 
 struct VariableInfo {
   ident: Ident,
@@ -451,7 +450,7 @@ fn resolve_block(ctx: *ResolutionContext, block: *Block) {
 
 fn resolve_let(ctx: *ResolutionContext, data: LetData) {
   push_variable(ctx, data.pat.ident);
-  resolve_type(ctx, data.ty);
+  resolve_type(ctx, data.ast_ty);
   if data.value  resolve_expr(ctx, data.value);
 }
 
@@ -481,11 +480,11 @@ fn resolve_expr(ctx: *ResolutionContext, expr: *Expr) {
 fn resolve_function(ctx: *ResolutionContext, item: *Item) {
   var func: FunctionData = item.node.function;
 
-  resolve_type(ctx, func.header.output);
+  resolve_type(ctx, func.header.output_ast);
   var i: u32 = 0;
   while i < func.header.num_parameters {
     var param: *FunctionParameter = &func.header.parameters[i];
-    resolve_type(ctx, param.ty);
+    resolve_type(ctx, param.ast_ty);
     i = i + 1;
   }
 
@@ -518,7 +517,7 @@ fn resolve_compound(ctx: *ResolutionContext, item: *Item) {
 
   var i: u32 = 0;
   while i <  data.num_fields {
-    resolve_type(ctx, data.fields[i].ty);
+    resolve_type(ctx, data.fields[i].ast_ty);
     i = i + 1;
   }
 }

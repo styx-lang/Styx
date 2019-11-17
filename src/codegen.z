@@ -4,7 +4,6 @@ use super::interning::*;
 use super::source_map::*;
 use super::error::*;
 use super::ast::*;
-use super::types::*;
 
 struct CodegenContext {
   out: *FILE,
@@ -245,11 +244,11 @@ fn generate_control_flow(ctx: *CodegenContext, is_continue: bool) {
 
 fn generate_let(ctx: *CodegenContext, data: LetData) {
 
-  generate_type(ctx, data.ty);
+  generate_type(ctx, data.ast_ty);
 
   var var_name: *char = get_str(ctx.interner, data.pat.ident.name);
 
-  strmap_insert(ctx.ident_is_ptr, var_name, type_is_ptr(data.ty));
+  strmap_insert(ctx.ident_is_ptr, var_name, type_is_ptr(data.ast_ty));
   fprintf(ctx.out, " %s ", var_name);
   if data.value {
     fprintf(ctx.out, "= ");
@@ -295,13 +294,13 @@ fn generate_variable(ctx: *CodegenContext, item: *Item) {
 
   emit_line_directive(ctx.out, ctx.source, item.span);
 
-  generate_type(ctx, item.node.variable.ty);
+  generate_type(ctx, item.node.variable.ast_ty);
 
   var var_name: *char = get_str(ctx.interner, item.ident.name);
 
   val module: *Module = ctx.current_module;
 
-  strmap_insert(ctx.ident_is_ptr, var_name, type_is_ptr(item.node.variable.ty));
+  strmap_insert(ctx.ident_is_ptr, var_name, type_is_ptr(item.node.variable.ast_ty));
   mangle_path_and_ident(ctx, module.path, item.ident);
   if item.node.variable.body {
     fprintf(ctx.out, "= ");
@@ -316,7 +315,7 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 
   val func: FunctionData = item.node.function;
   val header: FunctionHeader = func.header;
-  generate_type(ctx, header.output);
+  generate_type(ctx, header.output_ast);
 
   if item.should_mangle  mangle_function_name(ctx, ctx.current_module, item.ident, header);
   else  fprintf(ctx.out, " %s", get_str(ctx.interner, item.ident.name));
@@ -324,7 +323,7 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 
   var i: u32 = 0;
   while i < header.num_parameters {
-    var ty: *AstType = header.parameters[i].ty;
+    var ty: *AstType = header.parameters[i].ast_ty;
     if ty.kind == AstTypeKind::Variadic {
       fprintf(ctx.out, "...");
       break;
@@ -333,7 +332,7 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
     generate_type(ctx, ty);
 
     var param_name: *char = get_str(ctx.interner, header.parameters[i].pat.ident.name);
-    strmap_insert(ctx.ident_is_ptr, param_name, type_is_ptr(header.parameters[i].ty));
+    strmap_insert(ctx.ident_is_ptr, param_name, type_is_ptr(header.parameters[i].ast_ty));
     fprintf(ctx.out, " %s", param_name);
     if i < header.num_parameters - 1  fprintf(ctx.out, ", ");
     i = i + 1;
@@ -388,7 +387,7 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
     fprintf(ctx.out, " {\n");
     var i: u32 = 0;
     while i < data.num_fields {
-      generate_type(ctx, data.fields[i].ty);
+      generate_type(ctx, data.fields[i].ast_ty);
 
       var field_name: *char = get_str(ctx.interner, data.fields[i].ident.name);
       fprintf(ctx.out, " %s;\n", field_name);

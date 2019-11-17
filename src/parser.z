@@ -443,7 +443,7 @@ fn parse_let(ctx: *ParsingContext) -> *Expr {
   consume(ctx);
   expr.node._let.pat = parse_pattern(ctx);
   expect(ctx, TokenKind::Colon);
-  expr.node._let.ty = parse_type(ctx);
+  expr.node._let.ast_ty = parse_type(ctx);
 
   if accept(ctx, TokenKind::Equal)  expr.node._let.value = parse_expression(ctx, 0);
   else  expr.node._let.value = 0;
@@ -534,7 +534,7 @@ fn parse_variable_decl(ctx: *ParsingContext, item: *Item) {
 
   item.ident = parse_identifier(ctx);
   expect(ctx, TokenKind::Colon);
-  item.node.variable.ty = parse_type(ctx);
+  item.node.variable.ast_ty = parse_type(ctx);
 
   if accept(ctx, TokenKind::Equal)  item.node.variable.body = parse_expression(ctx, 0);
   else  item.node.variable.body = 0;
@@ -564,7 +564,7 @@ fn parse_compound_decl(ctx: *ParsingContext, item: *Item) {
     expect(ctx, TokenKind::Colon);
 
     val type: *AstType = parse_type(ctx);
-    item.node.compound.fields[item.node.compound.num_fields].ty = type;
+    item.node.compound.fields[item.node.compound.num_fields].ast_ty = type;
     item.node.compound.num_fields = item.node.compound.num_fields + 1;
     expect(ctx, TokenKind::Comma);
   }
@@ -607,18 +607,18 @@ fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
 
     expect(ctx, TokenKind::Colon);
     val type: *AstType = parse_type(ctx);
-    header.parameters[header.num_parameters].ty = type;
+    header.parameters[header.num_parameters].ast_ty = type;
     header.num_parameters = header.num_parameters + 1;
 
     accept(ctx, TokenKind::Comma);
   }
 
-  if accept(ctx, TokenKind::Arrow)  header.output = parse_type(ctx);
+  if accept(ctx, TokenKind::Arrow)  header.output_ast = parse_type(ctx);
   else {
     //TODO Cleanup when proper field access has been implemented
     var output: *AstType = malloc(sizeof(AstType));
     output.kind = AstTypeKind::Void;
-    header.output = output;
+    header.output_ast = output;
   }
 
   return header;
@@ -675,7 +675,7 @@ fn parse_item(ctx: *ParsingContext) -> *Item {
   item.should_mangle = !accept(ctx, TokenKind::Extern);
 
   val tok : Token = look_ahead(ctx, 0);
-  
+
   if tok.kind == TokenKind::Fn   parse_function_decl(ctx, item);
   else if tok.kind == TokenKind::Struct || tok.kind == TokenKind::Union  parse_compound_decl(ctx, item);
   else if tok.kind == TokenKind::Enum  parse_enum_decl(ctx, item);

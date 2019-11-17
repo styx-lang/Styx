@@ -3,7 +3,6 @@ use super::intmap::IntMap;
 use super::source_map::*;
 use super::interning::Sid;
 use super::error::*;
-use super::types::*;
 
 struct AstType {}
 struct Expr {}
@@ -15,6 +14,42 @@ struct Ident {
   span: Span,
 }
 
+enum IntegerSize {
+  I8,
+  I16,
+  I32,
+  I64,
+  Int_Arch,
+  Int_Unspecified,
+}
+
+enum FloatingSize {
+  F32,
+  F64,
+  Float_Unspecified,
+}
+
+enum PrimitiveTyKind {
+  Void,
+  ConstVoid,
+  Signed,
+  Unsigned,
+  Floating,
+  Bool,
+  Char,
+  ConstChar,
+}
+
+union PrimitiveTyNode {
+  integer: IntegerSize,
+  floating: FloatingSize,
+}
+
+struct PrimitiveTy {
+  node: PrimitiveTyNode,
+  kind: PrimitiveTyKind,
+}
+
 enum BindingKind {
   Item,
   Variable,
@@ -22,8 +57,9 @@ enum BindingKind {
   Variant,
 }
 
-struct FunctionParameter {}
+struct Item {}
 struct EnumVariant {}
+struct PrimitiveTy {}
 
 union BindingNode {
   item: *Item,
@@ -42,6 +78,61 @@ struct Path {
   num_segments: u32,
   binding: Binding,
   span: Span,
+}
+
+struct Ty {};
+
+struct FieldDef {
+  name: Sid,
+  ty: *Ty,
+}
+
+struct CompoundDef {
+  path: Path,
+  fields: *FieldDef,
+  num_fields: u32,
+}
+
+struct EnumDef {
+  path: Path,
+  variants: *Sid,
+  num_variants: u32,
+}
+
+struct FnDef {
+  parameters: **Ty,
+  num_parameters: u32,
+  output: *Ty,
+}
+
+enum TyKind {
+  Void,
+  ConstVoid,
+  Bool,
+  Char,
+  ConstChar,
+  Signed,
+  Unsigned,
+  Floating,
+  Ptr,
+  Fn,
+  Enum,
+  Struct,
+  Union,
+}
+
+union TyKindNode {
+  integer: IntegerSize,
+  floating: FloatingSize,
+  ptr: *Ty,
+  compound: CompoundDef,
+  _enum: EnumDef,
+  function: FnDef,
+}
+
+struct Ty {
+  kind: TyKind,
+  node: TyKindNode,
 }
 
 struct Pattern {
@@ -91,6 +182,7 @@ union AstTypeKindNode {
 struct AstType {
   kind: AstTypeKind,
   node: AstTypeKindNode,
+  ty: *Ty,
 }
 
 enum LiteralKind {
@@ -201,7 +293,7 @@ struct AssignmentData {
 struct LetData {
   pat: Pattern,
   value: *Expr,
-  ty: *AstType,
+  ast_ty: *AstType,
 }
 
 enum ExprKind {
@@ -246,6 +338,7 @@ struct Expr {
   span: Span,
   kind: ExprKind,
   node: ExprKindNode,
+  ty: *Ty,
 }
 
 struct Block {
@@ -265,7 +358,7 @@ struct Visibility {
 
 struct CompoundField {
   ident: Ident,
-  ty: *AstType,
+  ast_ty: *AstType,
 }
 
 struct CompoundData {
@@ -285,14 +378,14 @@ struct EnumData {
 
 struct FunctionParameter {
   pat: Pattern,
-  ty: *AstType,
+  ast_ty: *AstType,
 }
 
 
 struct FunctionHeader {
   parameters: *FunctionParameter,
   num_parameters: u32,
-  output: *AstType,
+  output_ast: *AstType,
   generics: Generics,
 }
 
@@ -303,7 +396,7 @@ struct FunctionData {
 
 
 struct VariableData {
-  ty: *AstType,
+  ast_ty: *AstType,
   mutable: bool,
   body: *Expr,
 }
