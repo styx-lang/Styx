@@ -108,6 +108,7 @@ struct FnDef {
 enum TyKind {
   Void,
   ConstVoid,
+  Variadic,
   Bool,
   Char,
   ConstChar,

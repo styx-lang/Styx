@@ -8,6 +8,7 @@ use super::error::*;
 struct CommonTypes {
   _void: *Ty,
   _constvoid: *Ty,
+  _variadic: *Ty,
   _bool: *Ty,
   _char: *Ty,
   _constchar: *Ty,
@@ -113,6 +114,7 @@ fn create_common_types(ctx: *TypeContext) {
   val t: *CommonTypes = &ctx.common;
   t._void = create_base_type(ctx, TyKind::Void);
   t._constvoid = create_base_type(ctx, TyKind::ConstVoid);
+  t._variadic = create_base_type(ctx, TyKind::Variadic);
   t._bool = create_base_type(ctx, TyKind::Bool);
   t._char = create_base_type(ctx, TyKind::Char);
   t._constchar = create_base_type(ctx, TyKind::ConstChar);
@@ -252,6 +254,7 @@ fn ast_type_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
   if ast_ty.kind == AstTypeKind::Void  return ctx.common._void;
   else if ast_ty.kind == AstTypeKind::Path  return ast_path_to_ty(ctx, ast_ty);
   else if ast_ty.kind == AstTypeKind::Ptr  return ast_ptr_to_ty(ctx, ast_ty);
+  else if ast_ty.kind == AstTypeKind::Variadic  return ctx.common._variadic;
   else abort();
 }
 
@@ -417,31 +420,6 @@ fn check_variable(ctx: *TypeContext, item: *Item) {
 
 fn check_compound(ctx: *TypeContext, item: *Item) {
 
-  val ty: *Ty = item.node.compound.ty;
-  val def: *CompoundDef = &ty.node.compound;
-
-  def.fields = malloc(sizeof(FieldDef) * item.node.compound.num_fields);
-  var i: u32 = 0;
-  while i < item.node.compound.num_fields {
-    def.fields[i].name = item.node.compound.fields[i].ident.name;
-    def.fields[i].ty = ast_type_to_ty(ctx, item.node.compound.fields[i].ast_ty);
-    i = i + 1;
-  }
-  def.num_fields = item.node.compound.num_fields;
-}
-
-fn check_enum(ctx: *TypeContext, item: *Item) {
-
-  val ty: *Ty = item.node._enum.ty;
-  val def: *EnumDef = &ty.node._enum;
-
-  var i: u32 = 0;
-  while i < item.node._enum.num_variants {
-    def.variants[i] = item.node._enum.variants[i].ident.name;
-    i = i + 1;
-  }
-  def.num_variants = item.node._enum.num_variants;
-
 }
 
 fn check_function(ctx: *TypeContext, item: *Item) {
@@ -457,6 +435,7 @@ fn check_item(ctx: *TypeContext, item: *Item) {
   else if item.kind == ItemKind::Module  check_mod(ctx, item.node.module);
   else if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  check_variable(ctx, item);
   else if item.kind == ItemKind::Function  check_function(ctx, item);
+  else abort();
 }
 
 fn check_mod(ctx: *TypeContext, module: *Module) {
@@ -469,33 +448,53 @@ fn check_mod(ctx: *TypeContext, module: *Module) {
 
 fn collect_enum(ctx: *TypeContext, item: *Item, path: Path) {
 
-  val def: EnumDef;
-  def.path = path;
+  val ty: *Ty = item.node._enum.ty;
+  val def: *EnumDef = &ty.node._enum;
 
-  val ty: Ty;
-  ty.kind = TyKind::Enum;
-
-  ty.node._enum = def;
-
-  item.node._enum.ty = intern_ty(ctx, ty);
+  def.variants = malloc(sizeof(Sid) * item.node._enum.num_variants);
+  var i: u32 = 0;
+  while i < item.node._enum.num_variants {
+    def.variants[i] = item.node._enum.variants[i].ident.name;
+    i = i + 1;
+  }
+  def.num_variants = item.node._enum.num_variants;
 }
 
 fn collect_function(ctx: *TypeContext, item: *Item) {
 
+  val header: FunctionHeader = item.node.function.header;
+
+  val def: FnDef;
+
+  def.output = ast_type_to_ty(ctx, header.output_ast_ty);
+  def.num_parameters = header.num_parameters;
+  def.parameters = malloc(8 * def.num_parameters);
+
+  var i: u32 = 0;
+  while i < def.num_parameters {
+    def.parameters[i] = ast_type_to_ty(ctx, header.parameters[i].ast_ty);
+    i = i + 1;
+  }
+
+  val ty: Ty;
+  ty.kind = TyKind::Fn;
+  ty.node.function = def;
+
+  item.node.function.header.ty = intern_ty(ctx, ty);
 }
 
 fn collect_compound(ctx: *TypeContext, item: *Item, path: Path) {
+  val ty: *Ty = item.node.compound.ty;
+  val def: *CompoundDef = &ty.node.compound;
 
-  val def: CompoundDef;
-  def.path = path;
-
-  val ty: Ty;
-  if item.kind == ItemKind::Struct  ty.kind = TyKind::Struct;
-  else if item.kind == ItemKind::Union  ty.kind = TyKind::Union;
-
-  ty.node.compound = def;
-
-  item.node.compound.ty = intern_ty(ctx, ty);
+  def.fields = malloc(sizeof(FieldDef) * item.node.compound.num_fields);
+  var i: u32 = 0;
+  while i < item.node.compound.num_fields {
+    def.fields[i].name = item.node.compound.fields[i].ident.name;
+    def.fields[i].ty = ast_type_to_ty(ctx, item.node.compound.fields[i].ast_ty);
+    i = i + 1;
+  }
+  def.num_fields = item.node.compound.num_fields;
 }
 
 fn collect_mod(ctx: *TypeContext, module: *Module);
@@ -517,6 +516,45 @@ fn collect_mod(ctx: *TypeContext, module: *Module) {
   }
 }
 
+fn collect_names(ctx: *TypeContext, module: *Module) {
+  var i: u32 = 0;
+  while i < module.num_items {
+    var item: *Item = module.items[i];
+    if item.kind == ItemKind::Struct || item.kind == ItemKind::Union {
+      val def: CompoundDef;
+      def.path.num_segments = module.path.num_segments + 1;
+      def.path.segments = malloc(sizeof(Ident) * def.path.num_segments);
+      memcpy(def.path.segments, module.path.segments, sizeof(Ident) * module.path.num_segments);
+      def.path.segments[module.path.num_segments] = item.ident;
+
+      val ty: Ty;
+      if item.kind == ItemKind::Struct  ty.kind = TyKind::Struct;
+      else if item.kind == ItemKind::Union  ty.kind = TyKind::Union;
+
+      ty.node.compound = def;
+
+      item.node.compound.ty = intern_ty(ctx, ty);
+    }
+    else if item.kind == ItemKind::Enum {
+
+      val def: EnumDef;
+      def.path.num_segments = module.path.num_segments + 1;
+      def.path.segments = malloc(sizeof(Ident) * def.path.num_segments);
+      memcpy(def.path.segments, module.path.segments, sizeof(Ident) * module.path.num_segments);
+      def.path.segments[module.path.num_segments] = item.ident;
+
+      val ty: Ty;
+      ty.kind = TyKind::Enum;
+
+      ty.node._enum = def;
+
+      item.node._enum.ty = intern_ty(ctx, ty);
+    }
+    else if item.kind == ItemKind::Module  collect_names(ctx, item.node.module);
+    i = i + 1;
+  }
+}
+
 fn check(sess: *Session, ast: *Ast) {
   var ctx: TypeContext;
 
@@ -528,6 +566,7 @@ fn check(sess: *Session, ast: *Ast) {
   ctx.next_type_idx = 1;
   create_common_types(&ctx);
 
-  collect_mod(&ctx, ast.root_module);
+  collect_names(&ctx, ast.root_module);
+  //collect_mod(&ctx, ast.root_module);
   //check_mod(&ctx, ast.root_module);
 }
