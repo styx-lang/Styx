@@ -365,6 +365,7 @@ struct CompoundData {
   fields: *CompoundField,
   num_fields: u32,
   generics: Generics,
+  ty: *Ty,
 }
 
 struct EnumVariant {
@@ -374,6 +375,7 @@ struct EnumVariant {
 struct EnumData {
   variants: *EnumVariant,
   num_variants: u32,
+  ty: *Ty,
 }
 
 struct FunctionParameter {
@@ -385,8 +387,9 @@ struct FunctionParameter {
 struct FunctionHeader {
   parameters: *FunctionParameter,
   num_parameters: u32,
-  output_ast: *AstType,
+  output_ast_ty: *AstType,
   generics: Generics,
+  ty: *Ty,
 }
 
 struct FunctionData {
@@ -397,6 +400,7 @@ struct FunctionData {
 
 struct VariableData {
   ast_ty: *AstType,
+  ty: *Ty,
   mutable: bool,
   body: *Expr,
 }

@@ -54,7 +54,7 @@ fn main(argc: i32, argv: **char) -> i32 {
   val ast: Ast = parse(&sess, root_module);
 
   resolve(&sess, &ast);
-  //check(&sess, &ast);
+  check(&sess, &ast);
   generate(&sess, ast, argv[2]);
 
   return 0;

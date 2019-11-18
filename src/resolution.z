@@ -480,7 +480,7 @@ fn resolve_expr(ctx: *ResolutionContext, expr: *Expr) {
 fn resolve_function(ctx: *ResolutionContext, item: *Item) {
   var func: FunctionData = item.node.function;
 
-  resolve_type(ctx, func.header.output_ast);
+  resolve_type(ctx, func.header.output_ast_ty);
   var i: u32 = 0;
   while i < func.header.num_parameters {
     var param: *FunctionParameter = &func.header.parameters[i];

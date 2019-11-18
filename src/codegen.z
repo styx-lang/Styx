@@ -315,7 +315,7 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 
   val func: FunctionData = item.node.function;
   val header: FunctionHeader = func.header;
-  generate_type(ctx, header.output_ast);
+  generate_type(ctx, header.output_ast_ty);
 
   if item.should_mangle  mangle_function_name(ctx, ctx.current_module, item.ident, header);
   else  fprintf(ctx.out, " %s", get_str(ctx.interner, item.ident.name));

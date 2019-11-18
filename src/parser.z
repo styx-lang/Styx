@@ -613,12 +613,12 @@ fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
     accept(ctx, TokenKind::Comma);
   }
 
-  if accept(ctx, TokenKind::Arrow)  header.output_ast = parse_type(ctx);
+  if accept(ctx, TokenKind::Arrow)  header.output_ast_ty = parse_type(ctx);
   else {
     //TODO Cleanup when proper field access has been implemented
     var output: *AstType = malloc(sizeof(AstType));
     output.kind = AstTypeKind::Void;
-    header.output_ast = output;
+    header.output_ast_ty = output;
   }
 
   return header;

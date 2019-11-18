@@ -161,18 +161,68 @@ fn primitive_to_ty(ctx: *TypeContext, prim: PrimitiveTy) -> *Ty {
     else if prim.node.floating == FloatingSize::F64  return t._f64;
     else  abort();
   }
+  else  abort();
 }
 
-fn ast_compound_to_ty(ctx: *TypeContext, path: Path, data: CompoundData) -> *Ty {
-  return 0;
+fn ast_compound_to_ty(ctx: *TypeContext, path: Path, kind: ItemKind, data: CompoundData) -> *Ty {
+  val ty: Ty;
+  if kind == ItemKind::Struct  ty.kind = TyKind::Struct;
+  else if kind == ItemKind::Union  ty.kind = TyKind::Union;
+  else  abort();
+
+  val def: CompoundDef;
+  def.path = path;
+  def.num_fields = data.num_fields;
+  def.fields = malloc(sizeof(FieldDef) * data.num_fields);
+
+  var i: u32 = 0;
+  while i < def.num_fields {
+    def.fields[i].name = data.fields[i].ident.name;
+    def.fields[i].ty = ast_type_to_ty(ctx, data.fields[i].ast_ty);
+    i = i + 1;
+  }
+
+  ty.node.compound = def;
+
+  return intern_ty(ctx, ty);
 }
 
 fn ast_enum_to_ty(ctx: *TypeContext, path: Path, data: EnumData) -> *Ty {
-  return 0;
+  val ty: Ty;
+  ty.kind = TyKind::Enum;
+
+  val def: EnumDef;
+  def.path = path;
+  def.num_variants = data.num_variants;
+  def.variants = malloc(sizeof(Sid) * data.num_variants);
+
+  var i: u32 = 0;
+  while i < def.num_variants {
+    def.variants[i] = data.variants[i].ident.name;
+    i = i + 1;
+  }
+
+  ty.node._enum = def;
+
+  return intern_ty(ctx, ty);
 }
 
 fn ast_function_to_ty(ctx: *TypeContext, data: FunctionHeader) -> *Ty {
-  return 0;
+  val ty: Ty;
+  ty.kind = TyKind::Fn;
+
+  val def: FnDef;
+  def.num_parameters = data.num_parameters;
+  def.parameters = malloc(8 * data.num_parameters);
+  def.output = ast_type_to_ty(ctx, data.output_ast_ty);
+
+  var i: u32 = 0;
+  while i < def.num_parameters {
+    def.parameters[i] = ast_type_to_ty(ctx, data.parameters[i].ast_ty);
+    i = i + 1;
+  }
+
+  return intern_ty(ctx, ty);
 }
 
 fn ast_path_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
@@ -183,7 +233,7 @@ fn ast_path_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
   }
   else if binding.kind == BindingKind::Item {
     val item: *Item = binding.node.item;
-    if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  return ast_compound_to_ty(ctx, ast_ty.node.path, item.node.compound);
+    if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  return ast_compound_to_ty(ctx, ast_ty.node.path, item.kind, item.node.compound);
     else if item.kind == ItemKind::Function  return ast_function_to_ty(ctx, item.node.function.header);
     else if item.kind == ItemKind::Enum  return ast_enum_to_ty(ctx, ast_ty.node.path, item.node._enum);
     else  return null;
@@ -365,6 +415,35 @@ fn check_variable(ctx: *TypeContext, item: *Item) {
   }
 }
 
+fn check_compound(ctx: *TypeContext, item: *Item) {
+
+  val ty: *Ty = item.node.compound.ty;
+  val def: *CompoundDef = &ty.node.compound;
+
+  def.fields = malloc(sizeof(FieldDef) * item.node.compound.num_fields);
+  var i: u32 = 0;
+  while i < item.node.compound.num_fields {
+    def.fields[i].name = item.node.compound.fields[i].ident.name;
+    def.fields[i].ty = ast_type_to_ty(ctx, item.node.compound.fields[i].ast_ty);
+    i = i + 1;
+  }
+  def.num_fields = item.node.compound.num_fields;
+}
+
+fn check_enum(ctx: *TypeContext, item: *Item) {
+
+  val ty: *Ty = item.node._enum.ty;
+  val def: *EnumDef = &ty.node._enum;
+
+  var i: u32 = 0;
+  while i < item.node._enum.num_variants {
+    def.variants[i] = item.node._enum.variants[i].ident.name;
+    i = i + 1;
+  }
+  def.num_variants = item.node._enum.num_variants;
+
+}
+
 fn check_function(ctx: *TypeContext, item: *Item) {
 
   if item.node.function.body {
@@ -389,22 +468,16 @@ fn check_mod(ctx: *TypeContext, module: *Module) {
 }
 
 fn collect_enum(ctx: *TypeContext, item: *Item, path: Path) {
-  val def: EnumDef;
-  def.variants = malloc(sizeof(Ident) * item.node._enum.num_variants);
-  def.path = path;
 
-  var i: u32 = 0;
-  while i < item.node._enum.num_variants {
-    def.variants[i] = item.node._enum.variants[i].ident.name;
-    i = i + 1;
-  }
-  def.num_variants = item.node._enum.num_variants;
+  val def: EnumDef;
+  def.path = path;
 
   val ty: Ty;
   ty.kind = TyKind::Enum;
+
   ty.node._enum = def;
 
-  val ty_ptr: *Ty = intern_ty(ctx, ty);
+  item.node._enum.ty = intern_ty(ctx, ty);
 }
 
 fn collect_function(ctx: *TypeContext, item: *Item) {
@@ -414,16 +487,7 @@ fn collect_function(ctx: *TypeContext, item: *Item) {
 fn collect_compound(ctx: *TypeContext, item: *Item, path: Path) {
 
   val def: CompoundDef;
-  def.fields = malloc(sizeof(FieldDef) * item.node.compound.num_fields);
   def.path = path;
-
-  var i: u32 = 0;
-  while i < item.node.compound.num_fields {
-    def.fields[i].name = item.node.compound.fields[i].ident.name;
-    def.fields[i].ty = ast_type_to_ty(ctx, item.node.compound.fields[i].ast_ty);
-    i = i + 1;
-  }
-  def.num_fields = item.node.compound.num_fields;
 
   val ty: Ty;
   if item.kind == ItemKind::Struct  ty.kind = TyKind::Struct;
@@ -431,7 +495,7 @@ fn collect_compound(ctx: *TypeContext, item: *Item, path: Path) {
 
   ty.node.compound = def;
 
-  val ty_ptr: *Ty = intern_ty(ctx, ty);
+  item.node.compound.ty = intern_ty(ctx, ty);
 }
 
 fn collect_mod(ctx: *TypeContext, module: *Module);
