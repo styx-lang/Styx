@@ -41,17 +41,8 @@ fn main(argc: i32, argv: **char) -> i32 {
   var root_filename: *char = basename(argv[1]);
   sess.root_path = dirname(argv[1]);
 
-  var root_module: *char = malloc(strlen(root_filename) + 1);
-
   strtok(root_filename, ".z");
-  var dot_found: *char = strtok(null, ".");
-  if dot_found != null {
-    memcpy(root_module, root_filename, dot_found - root_filename);
-    root_module[dot_found - root_filename + 1] = 0;
-  }
-  else  abort();
-
-  val ast: Ast = parse(&sess, root_module);
+  val ast: Ast = parse(&sess, root_filename);
 
   resolve(&sess, &ast);
   check(&sess, &ast);

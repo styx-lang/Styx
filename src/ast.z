@@ -264,6 +264,12 @@ struct CallData {
   num_args: u32,
 }
 
+struct CastData {
+  inner: *Expr,
+  ast_ty: *AstType,
+  ty: *Ty,
+}
+
 struct ConditionalData {
   condition: *Expr,
   then: *Expr,
@@ -306,6 +312,7 @@ enum ExprKind {
   Binary,
   Block,
   Call,
+  Cast,
   Conditional,
   Field,
   Indexing,
@@ -326,6 +333,7 @@ union ExprKindNode {
   binary: BinaryData,
   block: *Block,
   call: CallData,
+  _cast: CastData,
   conditional: ConditionalData,
   control_flow_is_continue: bool,
   field: FieldData,
