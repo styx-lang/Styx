@@ -217,12 +217,21 @@ fn check_unary(ctx: *TypeContext, expr: *Expr) -> *Ty {
   return inner;
 }
 
+fn operator_is_boolean(op: BinaryOperatorKind) -> bool {
+  return op == BinaryOperatorKind::Less || op == BinaryOperatorKind::LessEq || op == BinaryOperatorKind::NotEq ||
+    op == BinaryOperatorKind::Greater || op == BinaryOperatorKind::GreaterEq || op == BinaryOperatorKind::Equality ||
+    op == BinaryOperatorKind::And || op == BinaryOperatorKind::Or;
+}
+
 fn check_binary(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  val op: BinaryOperatorKind = expr.node.binary.op;
   var left: *Ty = check_expr(ctx, expr.node.binary.left);
   var right: *Ty = check_expr(ctx, expr.node.binary.right);
+
   if left != right  emit_warning(ctx.source_map, expr.span, "Arguments of binary op must be compatible");
 
-  return left;
+  if operator_is_boolean(op)  return ctx.common._bool;
+  else  return left;
 }
 
 fn check_block(ctx: *TypeContext, block: *Block) {
@@ -245,15 +254,21 @@ fn check_call(ctx: *TypeContext, expr: *Expr) -> *Ty {
 
   val fn_def: *FnDef = &fn_ty.node.function;
 
-  if fn_def.num_parameters == call.num_args {
+  var is_variadic: bool = false;
+  if fn_def.num_parameters > 0 {
+    val param_ty: *Ty = fn_def.parameters[fn_def.num_parameters - 1];
+    is_variadic = param_ty.kind == TyKind::Variadic;
+  }
+
+  if call.num_args == fn_def.num_parameters || (call.num_args >= (fn_def.num_parameters-1) && is_variadic)  {
     var i: i32 = 0;
-    while i < call.num_args {
+    while i < call.num_args && i < fn_def.num_parameters {
         val arg_ty: *Ty = check_expr(ctx, call.args[i]);
         if arg_ty != fn_def.parameters[i]  emit_warning(ctx.source_map, expr.span, "Function parameter type mismatch");
         i = i + 1;
     }
   }
-  else  emit_warning(ctx.source_map, expr.span, "Called function with incorrect number of arguments");
+  else  emit_error(ctx.source_map, expr.span, "Called function with incorrect number of arguments");
   return fn_def.output;
 }
 
