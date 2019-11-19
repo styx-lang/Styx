@@ -75,19 +75,16 @@ fn hash_ty(ty: *Ty) -> u64 {
   return h;
 }
 
-fn intern_ty_to_idx(ctx: *TypeContext, ty: Ty) -> u32 {
+fn intern_ty(ctx: *TypeContext, ty: Ty) -> *Ty {
   val h: u64 = hash_ty(&ty);
   var ty_idx: u32 = intmap_lookup(ctx.types_lookup, h);
   if ty_idx == 0 {
     ty_idx = ctx.next_type_idx;
     ctx.next_type_idx = ctx.next_type_idx + 1;
     intmap_insert(ctx.types_lookup, h, ty_idx);
+    ctx.types[ty_idx] = ty;
   }
-  return ty_idx;
-}
-
-fn intern_ty(ctx: *TypeContext, ty: Ty) -> *Ty {
-  return &ctx.types[intern_ty_to_idx(ctx, ty)];
+  return &ctx.types[ty_idx];
 }
 
 fn create_base_type(ctx: *TypeContext, kind: TyKind) -> *Ty {
@@ -166,67 +163,6 @@ fn primitive_to_ty(ctx: *TypeContext, prim: PrimitiveTy) -> *Ty {
   else  abort();
 }
 
-fn ast_compound_to_ty(ctx: *TypeContext, path: Path, kind: ItemKind, data: CompoundData) -> *Ty {
-  val ty: Ty;
-  if kind == ItemKind::Struct  ty.kind = TyKind::Struct;
-  else if kind == ItemKind::Union  ty.kind = TyKind::Union;
-  else  abort();
-
-  val def: CompoundDef;
-  def.path = path;
-  def.num_fields = data.num_fields;
-  def.fields = malloc(sizeof(FieldDef) * data.num_fields);
-
-  var i: u32 = 0;
-  while i < def.num_fields {
-    def.fields[i].name = data.fields[i].ident.name;
-    def.fields[i].ty = ast_type_to_ty(ctx, data.fields[i].ast_ty);
-    i = i + 1;
-  }
-
-  ty.node.compound = def;
-
-  return intern_ty(ctx, ty);
-}
-
-fn ast_enum_to_ty(ctx: *TypeContext, path: Path, data: EnumData) -> *Ty {
-  val ty: Ty;
-  ty.kind = TyKind::Enum;
-
-  val def: EnumDef;
-  def.path = path;
-  def.num_variants = data.num_variants;
-  def.variants = malloc(sizeof(Sid) * data.num_variants);
-
-  var i: u32 = 0;
-  while i < def.num_variants {
-    def.variants[i] = data.variants[i].ident.name;
-    i = i + 1;
-  }
-
-  ty.node._enum = def;
-
-  return intern_ty(ctx, ty);
-}
-
-fn ast_function_to_ty(ctx: *TypeContext, data: FunctionHeader) -> *Ty {
-  val ty: Ty;
-  ty.kind = TyKind::Fn;
-
-  val def: FnDef;
-  def.num_parameters = data.num_parameters;
-  def.parameters = malloc(8 * data.num_parameters);
-  def.output = ast_type_to_ty(ctx, data.output_ast_ty);
-
-  var i: u32 = 0;
-  while i < def.num_parameters {
-    def.parameters[i] = ast_type_to_ty(ctx, data.parameters[i].ast_ty);
-    i = i + 1;
-  }
-
-  return intern_ty(ctx, ty);
-}
-
 fn ast_path_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
   val binding: Binding = ast_ty.node.path.binding;
 
@@ -235,9 +171,9 @@ fn ast_path_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
   }
   else if binding.kind == BindingKind::Item {
     val item: *Item = binding.node.item;
-    if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  return ast_compound_to_ty(ctx, ast_ty.node.path, item.kind, item.node.compound);
-    else if item.kind == ItemKind::Function  return ast_function_to_ty(ctx, item.node.function.header);
-    else if item.kind == ItemKind::Enum  return ast_enum_to_ty(ctx, ast_ty.node.path, item.node._enum);
+    if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  return item.node.compound.ty;
+    else if item.kind == ItemKind::Function  return item.node.function.header.ty;
+    else if item.kind == ItemKind::Enum  return item.node._enum.ty;
     else  return null;
   }
   else abort(); //TODO
@@ -284,7 +220,7 @@ fn check_unary(ctx: *TypeContext, expr: *Expr) -> *Ty {
 fn check_binary(ctx: *TypeContext, expr: *Expr) -> *Ty {
   var left: *Ty = check_expr(ctx, expr.node.binary.left);
   var right: *Ty = check_expr(ctx, expr.node.binary.right);
-  if left != right  emit_error(ctx.source_map, expr.span, "Arguments of binary op must be compatible");
+  if left != right  emit_warning(ctx.source_map, expr.span, "Arguments of binary op must be compatible");
 
   return left;
 }
@@ -305,16 +241,19 @@ fn check_block_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
 fn check_call(ctx: *TypeContext, expr: *Expr) -> *Ty {
   var call: CallData = expr.node.call;
   val fn_ty: *Ty = check_expr(ctx, call.func);
-  if fn_ty.kind != TyKind::Fn  emit_error(ctx.source_map, expr.span, "Tried to call non-function");
+  if fn_ty.kind != TyKind::Fn  emit_warning(ctx.source_map, expr.span, "Tried to call non-function");
 
   val fn_def: *FnDef = &fn_ty.node.function;
 
-  var i: i32 = 0;
-  while i < call.num_args {
-    val arg_ty: *Ty = check_expr(ctx, call.args[i]);
-    if arg_ty != fn_def.parameters[i]  emit_error(ctx.source_map, expr.span, "Function parameter type mismatch");
-    i = i + 1;
+  if fn_def.num_parameters == call.num_args {
+    var i: i32 = 0;
+    while i < call.num_args {
+        val arg_ty: *Ty = check_expr(ctx, call.args[i]);
+        if arg_ty != fn_def.parameters[i]  emit_warning(ctx.source_map, expr.span, "Function parameter type mismatch");
+        i = i + 1;
+    }
   }
+  else  emit_warning(ctx.source_map, expr.span, "Called function with incorrect number of arguments");
   return fn_def.output;
 }
 
@@ -322,7 +261,7 @@ fn check_conditional(ctx: *TypeContext, expr: *Expr) -> *Ty {
   var data: ConditionalData = expr.node.conditional;
   var condition: *Expr = data.condition;
   val cond_ty: *Ty = check_expr(ctx, condition);
-  if cond_ty.kind != TyKind::Bool  emit_error(ctx.source_map, condition.span, "Condition must be of type bool");
+  if cond_ty.kind != TyKind::Bool  emit_warning(ctx.source_map, condition.span, "Condition must be of type bool");
 
   check_expr(ctx, data.then);
   if data.otherwise {
@@ -335,7 +274,7 @@ fn check_while(ctx: *TypeContext, expr: *Expr) -> *Ty {
   var data: WhileData = expr.node.whl;
   var condition: *Expr = data.condition;
   val cond_ty: *Ty = check_expr(ctx, condition);
-  if cond_ty.kind != TyKind::Bool  emit_error(ctx.source_map, condition.span, "Condition must be of type bool");
+  if cond_ty.kind != TyKind::Bool  emit_warning(ctx.source_map, condition.span, "Condition must be of type bool");
   check_expr(ctx, data.body);
   return ctx.common._void;
 }
@@ -343,10 +282,10 @@ fn check_while(ctx: *TypeContext, expr: *Expr) -> *Ty {
 fn check_indexing(ctx: *TypeContext, expr: *Expr) -> *Ty {
   val data: IndexingData = expr.node.indexing;
   val array_ty: *Ty = check_expr(ctx, data.array);
-  if array_ty.kind != TyKind::Ptr   emit_error(ctx.source_map, expr.span, "Cannot index into non-ptr type");
+  if array_ty.kind != TyKind::Ptr   emit_warning(ctx.source_map, expr.span, "Cannot index into non-ptr type");
   val index_ty: *Ty = check_expr(ctx, data.index);
   if !(index_ty.kind == TyKind::Signed || index_ty.kind == TyKind::Unsigned) {
-     emit_error(ctx.source_map, expr.span, "Cannot index into non-ptr type");
+     emit_warning(ctx.source_map, expr.span, "Cannot index into non-ptr type");
   }
   return array_ty.node.ptr;
 }
@@ -369,27 +308,69 @@ fn check_field(ctx: *TypeContext, expr: *Expr) -> *Ty {
     if compound.fields[i].name.x == data.ident.name.x {
       return compound.fields[i].ty;
     }
+    i = i + 1;
   }
-  emit_error(ctx.source_map, expr.span, "Compound type has no such field");
+  emit_warning(ctx.source_map, expr.span, "Compound type has no such field");
   return null;
 }
 
 fn check_path(ctx: *TypeContext, path: *Path) -> *Ty {
-  abort(); //TODO
+  if path.binding.kind == BindingKind::Item {
+    val item: *Item = path.binding.node.item;
+    if item.kind == ItemKind::Struct || item.kind == ItemKind::Union {
+      return item.node.compound.ty;
+    }
+    else if item.kind == ItemKind::Enum {
+      return item.node._enum.ty;
+    }
+    else if item.kind == ItemKind::Function {
+      return item.node.function.header.ty;
+    }
+    else if item.kind == ItemKind::Const || item.kind == ItemKind::Variable {
+      return item.node.variable.ty;
+    }
+    else  abort();
+  }
+  else if path.binding.kind == BindingKind::Variable {
+    val data: *LetData = path.binding.node.variable;
+    return data.ty;
+  }
+  else if path.binding.kind == BindingKind::Parameter {
+    val param: *FunctionParameter = path.binding.node.parameter;
+    return param.ty;
+  }
+  else if path.binding.kind == BindingKind::Variant {
+    val variant: *EnumVariant = path.binding.node.variant;
+    val enum_item: *Item = variant._enum;
+    return enum_item.node._enum.ty;
+  }
+  else if path.binding.kind == BindingKind::PrimitiveType {
+    return primitive_to_ty(ctx, path.binding.node.primitive);
+  }
+  else abort();
 }
 
 
-fn check_let(ctx: *TypeContext, data: LetData) {
-  check_expr(ctx, data.value);
+fn check_let(ctx: *TypeContext, data: *LetData) -> *Ty {
+  data.ty = ast_type_to_ty(ctx, data.ast_ty);
+  if data.value  check_expr(ctx, data.value);
+  return ctx.common._void;
 }
 
-fn check_assignment(ctx: *TypeContext, assignment: AssignmentData) {
+fn check_assignment(ctx: *TypeContext, assignment: AssignmentData) -> *Ty {
   check_expr(ctx, assignment.left);
   check_expr(ctx, assignment.right);
+  return ctx.common._void;
 }
 
-fn check_return(ctx: *TypeContext, expr: *Expr) {
+fn check_return(ctx: *TypeContext, expr: *Expr) -> *Ty {
   check_expr(ctx, expr);
+  return ctx.common._void;
+}
+
+fn check_sizeof(ctx: *TypeContext, expr: *Expr) -> *Ty {
+  check_expr(ctx, expr);
+  return ctx.common._u64;
 }
 
 fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
@@ -398,11 +379,16 @@ fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
   else if expr.kind == ExprKind::Block  return check_block_expr(ctx, expr);
   else if expr.kind == ExprKind::Call  return check_call(ctx, expr);
   else if expr.kind == ExprKind::Conditional  return check_conditional(ctx, expr);
+  else if expr.kind == ExprKind::ControlFlow  return ctx.common._void;
   else if expr.kind == ExprKind::While  return check_while(ctx, expr);
   else if expr.kind == ExprKind::Indexing  return check_indexing(ctx, expr);
   else if expr.kind == ExprKind::Field  return check_field(ctx, expr);
   else if expr.kind == ExprKind::Path  return check_path(ctx, &expr.node.path);
   else if expr.kind == ExprKind::Literal  return ast_literal_to_ty(ctx, expr.node.lit);
+  else if expr.kind == ExprKind::Assignment  return check_assignment(ctx, expr.node.assignment);
+  else if expr.kind == ExprKind::Let  return check_let(ctx, &expr.node._let);
+  else if expr.kind == ExprKind::Return  return check_return(ctx, expr.node._return);
+  else if expr.kind == ExprKind::Sizeof  return check_sizeof(ctx, expr.node._sizeof);
   else abort();
 }
 
@@ -410,16 +396,10 @@ fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
 fn check_variable(ctx: *TypeContext, item: *Item) {
   var decl_ty: *Ty = ast_type_to_ty(ctx, item.node.variable.ast_ty);
 
-  printf("Checking %s\n", get_str(ctx.interner, item.ident.name));
-
   if item.node.variable.body {
     var expr_ty: *Ty = check_expr(ctx, item.node.variable.body);
     if decl_ty != expr_ty  emit_warning(ctx.source_map, item.span, "Variable type declaration does not match expression type");
   }
-}
-
-fn check_compound(ctx: *TypeContext, item: *Item) {
-
 }
 
 fn check_function(ctx: *TypeContext, item: *Item) {
@@ -432,6 +412,7 @@ fn check_function(ctx: *TypeContext, item: *Item) {
 fn check_item(ctx: *TypeContext, item: *Item) {
   if item.kind == ItemKind::Enum  {}
   else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  {}
+  else if item.kind == ItemKind::Use  {}
   else if item.kind == ItemKind::Module  check_mod(ctx, item.node.module);
   else if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  check_variable(ctx, item);
   else if item.kind == ItemKind::Function  check_function(ctx, item);
@@ -462,7 +443,7 @@ fn collect_enum(ctx: *TypeContext, item: *Item, path: Path) {
 
 fn collect_function(ctx: *TypeContext, item: *Item) {
 
-  val header: FunctionHeader = item.node.function.header;
+  val header: *FunctionHeader = &item.node.function.header;
 
   val def: FnDef;
 
@@ -472,7 +453,9 @@ fn collect_function(ctx: *TypeContext, item: *Item) {
 
   var i: u32 = 0;
   while i < def.num_parameters {
-    def.parameters[i] = ast_type_to_ty(ctx, header.parameters[i].ast_ty);
+    val param_ty: *Ty = ast_type_to_ty(ctx, header.parameters[i].ast_ty);
+    def.parameters[i] = param_ty;
+    header.parameters[i].ty = param_ty;
     i = i + 1;
   }
 
@@ -487,14 +470,18 @@ fn collect_compound(ctx: *TypeContext, item: *Item, path: Path) {
   val ty: *Ty = item.node.compound.ty;
   val def: *CompoundDef = &ty.node.compound;
 
-  def.fields = malloc(sizeof(FieldDef) * item.node.compound.num_fields);
-  var i: u32 = 0;
-  while i < item.node.compound.num_fields {
-    def.fields[i].name = item.node.compound.fields[i].ident.name;
-    def.fields[i].ty = ast_type_to_ty(ctx, item.node.compound.fields[i].ast_ty);
-    i = i + 1;
+  if item.node.compound.num_fields > 0 {
+
+    def.fields = malloc(sizeof(FieldDef) * item.node.compound.num_fields);
+    var i: u32 = 0;
+    while i < item.node.compound.num_fields {
+      def.fields[i].name = item.node.compound.fields[i].ident.name;
+      def.fields[i].ty = ast_type_to_ty(ctx, item.node.compound.fields[i].ast_ty);
+      i = i + 1;
+    }
+    def.num_fields = item.node.compound.num_fields;
   }
-  def.num_fields = item.node.compound.num_fields;
+
 }
 
 fn collect_mod(ctx: *TypeContext, module: *Module);
@@ -567,6 +554,6 @@ fn check(sess: *Session, ast: *Ast) {
   create_common_types(&ctx);
 
   collect_names(&ctx, ast.root_module);
-  //collect_mod(&ctx, ast.root_module);
-  //check_mod(&ctx, ast.root_module);
+  collect_mod(&ctx, ast.root_module);
+  check_mod(&ctx, ast.root_module);
 }

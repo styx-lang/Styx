@@ -53,17 +53,21 @@ struct PrimitiveTy {
 enum BindingKind {
   Item,
   Variable,
+  Parameter,
   PrimitiveType,
   Variant,
 }
 
 struct Item {}
 struct EnumVariant {}
+struct FunctionParameter {}
+struct LetData {}
 struct PrimitiveTy {}
 
 union BindingNode {
   item: *Item,
-  slot: u32,
+  variable: *LetData,
+  parameter: *FunctionParameter,
   primitive: PrimitiveTy,
   variant: *EnumVariant,
 }
@@ -295,6 +299,7 @@ struct LetData {
   pat: Pattern,
   value: *Expr,
   ast_ty: *AstType,
+  ty: *Ty,
 }
 
 enum ExprKind {
@@ -371,6 +376,7 @@ struct CompoundData {
 
 struct EnumVariant {
   ident: Ident,
+  _enum: *Item,
 }
 
 struct EnumData {
@@ -382,6 +388,7 @@ struct EnumData {
 struct FunctionParameter {
   pat: Pattern,
   ast_ty: *AstType,
+  ty: *Ty,
 }
 
 

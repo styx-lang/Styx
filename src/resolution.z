@@ -5,9 +5,20 @@ use super::source_map::*;
 use super::error::*;
 use super::ast::*;
 
+enum VariableInfoKind {
+  Variable,
+  Parameter,
+}
+
+union VariableInfoNode {
+  variable: *LetData,
+  parameter: *FunctionParameter,
+}
+
 struct VariableInfo {
   ident: Ident,
-  slot: u32,
+  kind: VariableInfoKind,
+  node: VariableInfoNode,
 }
 
 struct VariableBlock {
@@ -91,14 +102,24 @@ fn pop_block(ctx: *ResolutionContext) {
   ctx.stack_top = ctx.stack_top - 1;
 }
 
-fn push_variable(ctx: *ResolutionContext, ident: Ident) -> u32 {
+fn push_parameter(ctx: *ResolutionContext, ident: Ident, data: *FunctionParameter) {
   var scope: *Scope = &ctx.scope_stack[ctx.stack_top];
   if scope.kind != ScopeKind::VariableBlock  abort();
   var v: *VariableBlock = &scope.node.variable;
   v.variables[v.num_variables].ident = ident;
-  v.variables[v.num_variables].slot = v.num_variables;
+  v.variables[v.num_variables].kind = VariableInfoKind::Parameter;
+  v.variables[v.num_variables].node.parameter = data;
   v.num_variables = v.num_variables + 1;
-  return v.variables[v.num_variables].slot;
+}
+
+fn push_variable(ctx: *ResolutionContext, ident: Ident, data: *LetData) {
+  var scope: *Scope = &ctx.scope_stack[ctx.stack_top];
+  if scope.kind != ScopeKind::VariableBlock  abort();
+  var v: *VariableBlock = &scope.node.variable;
+  v.variables[v.num_variables].ident = ident;
+  v.variables[v.num_variables].kind = VariableInfoKind::Variable;
+  v.variables[v.num_variables].node.variable = data;
+  v.num_variables = v.num_variables + 1;
 }
 
 fn push_module(ctx: *ResolutionContext, module: *Module) {
@@ -137,8 +158,14 @@ fn lookup(ctx: *ResolutionContext, ident: Ident) -> Path {
             path.segments = malloc(sizeof(Ident));
             path.segments[0] = variable.ident;
             path.num_segments = 1;
-            path.binding.kind = BindingKind::Variable;
-            path.binding.node.slot = variable.slot;
+            if variable.kind == VariableInfoKind::Variable {
+              path.binding.kind = BindingKind::Variable;
+              path.binding.node.variable = variable.node.variable;
+            }
+            else if variable.kind == VariableInfoKind::Parameter {
+              path.binding.kind = BindingKind::Parameter;
+              path.binding.node.parameter = variable.node.parameter;
+            }
             return path;
         }
         j = j - 1;
@@ -448,8 +475,8 @@ fn resolve_block(ctx: *ResolutionContext, block: *Block) {
   pop_block(ctx);
 }
 
-fn resolve_let(ctx: *ResolutionContext, data: LetData) {
-  push_variable(ctx, data.pat.ident);
+fn resolve_let(ctx: *ResolutionContext, data: *LetData) {
+  push_variable(ctx, data.pat.ident, data);
   resolve_type(ctx, data.ast_ty);
   if data.value  resolve_expr(ctx, data.value);
 }
@@ -469,7 +496,7 @@ fn resolve_expr(ctx: *ResolutionContext, expr: *Expr) {
   else if expr.kind == ExprKind::Field  resolve_field(ctx, expr.node.field);
   else if expr.kind == ExprKind::Path  resolve_path(ctx, &expr.node.path);
   else if expr.kind == ExprKind::Assignment  resolve_assignment(ctx, expr.node.assignment);
-  else if expr.kind == ExprKind::Let  resolve_let(ctx, expr.node._let);
+  else if expr.kind == ExprKind::Let  resolve_let(ctx, &expr.node._let);
   else if expr.kind == ExprKind::Return  resolve_expr(ctx, expr.node._return);
   else if expr.kind == ExprKind::Literal {}
   else if expr.kind == ExprKind::ControlFlow  {}
@@ -493,7 +520,7 @@ fn resolve_function(ctx: *ResolutionContext, item: *Item) {
     var i: u32 = 0;
     while i < func.header.num_parameters {
       var param: *FunctionParameter = &func.header.parameters[i];
-      push_variable(ctx, param.pat.ident);
+      push_parameter(ctx, param.pat.ident, param);
 
       i = i + 1;
     }
@@ -504,6 +531,7 @@ fn resolve_function(ctx: *ResolutionContext, item: *Item) {
 }
 
 fn resolve_variable(ctx: *ResolutionContext, item: *Item) {
+  resolve_type(ctx, item.node.variable.ast_ty);
   push_block(ctx);
   if item.node.variable.body {
     resolve_expr(ctx, item.node.variable.body);

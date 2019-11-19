@@ -86,7 +86,7 @@ fn parse_identifier(ctx: *ParsingContext) -> Ident {
 
 fn parse_path(ctx: *ParsingContext) -> Path {
   var path: Path;
-  path.segments = malloc(8 * 4);
+  path.segments = malloc(sizeof(Ident) * 6);
   path.num_segments = 0;
   path.span.from = span_start(ctx);
 
@@ -585,6 +585,7 @@ fn parse_enum_decl(ctx: *ParsingContext, item: *Item) {
 
   while !accept(ctx, TokenKind::RightCurly) {
     item.node._enum.variants[item.node._enum.num_variants].ident = parse_identifier(ctx);
+    item.node._enum.variants[item.node._enum.num_variants]._enum = item;
     item.node._enum.num_variants = item.node._enum.num_variants + 1;
     expect(ctx, TokenKind::Comma);
   }
@@ -646,6 +647,7 @@ fn parse_use(ctx: *ParsingContext, item: *Item) {
 
   item.kind = ItemKind::Use;
   item.node._use = parse_path(ctx);
+  item.ident.name.x = 0
 
   accept(ctx, TokenKind::Semicolon);
 }
@@ -757,6 +759,7 @@ fn create_root_module(sess: *Session, ast: *Ast, path: *char) -> *Module {
   module.index = malloc(sizeof(IndexEntry) * 2048);
   module.num_indices = 1;
   module.parent = null;
+  module.path.num_segments = 0;
 
   var main_item: *Item = ast_create_item(ast);
   main_item.kind = ItemKind::Module;
