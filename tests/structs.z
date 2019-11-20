@@ -1,0 +1,23 @@
+extern fn printf(format: *constchar, args: ...) -> i32
+
+struct A {
+  x: u32,
+  y: i32,
+}
+
+struct B {
+  a: A,
+  p: *A,
+}
+
+fn main() {
+  var a: A;
+  a.x = 42;
+  a.y = 12;
+  var b: B;
+  b.a = a;
+  b.p = &a;
+  printf("%u %u\n", a.x, a.y);
+  printf("%u %u\n", b.a.x, b.a.y);
+  printf("%u %u\n", b.p.x, b.p.y);
+}
