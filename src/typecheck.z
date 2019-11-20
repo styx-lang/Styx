@@ -34,20 +34,6 @@ struct TypeContext {
   next_type_idx: u32,
 }
 
-fn integer_size(size: IntegerSize) -> u32 {
-  if size == IntegerSize::I8  return 8;
-  else if size == IntegerSize::I16  return 16;
-  else if size == IntegerSize::I32  return 32;
-  else if size == IntegerSize::I64  return 64;
-  else abort();
-}
-
-fn floating_size(size: FloatingSize) -> u32 {
-  if size == FloatingSize::F32  return 32;
-  else if size == FloatingSize::F64  return 64;
-  else abort();
-}
-
 fn hash_ty(ty: *Ty) -> u64;
 
 fn hash_fn(ty: *Ty) -> u64 {
@@ -640,6 +626,8 @@ fn collect_names(ctx: *TypeContext, module: *Module) {
       val def: CompoundDef;
       def.path.num_segments = module.path.num_segments + 1;
       def.path.segments = malloc(sizeof(Ident) * def.path.num_segments);
+      def.path.binding.kind = BindingKind::Item;
+      def.path.binding.node.item = item;
       memcpy(def.path.segments, module.path.segments, sizeof(Ident) * module.path.num_segments);
       def.path.segments[module.path.num_segments] = item.ident;
 
@@ -656,6 +644,8 @@ fn collect_names(ctx: *TypeContext, module: *Module) {
       val def: EnumDef;
       def.path.num_segments = module.path.num_segments + 1;
       def.path.segments = malloc(sizeof(Ident) * def.path.num_segments);
+      def.path.binding.kind = BindingKind::Item;
+      def.path.binding.node.item = item;
       memcpy(def.path.segments, module.path.segments, sizeof(Ident) * module.path.num_segments);
       def.path.segments[module.path.num_segments] = item.ident;
 

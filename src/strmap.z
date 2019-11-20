@@ -29,10 +29,11 @@ fn strmap_create(size: u64) -> *StrMap {
 fn strmap_hash(s: *char) -> u32 {
   var hash: u32 = 5381;
   var c: i32 = *s;
+  var i: u32 = 0;
   while c != 0 {
     hash = (hash << 5) + hash + c;
-    s = s + 1;
-    c = *s;
+    i = i + 1;
+    c = s[i];
   }
   if hash != 0  return hash;
   else return 1;

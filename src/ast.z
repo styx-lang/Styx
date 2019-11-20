@@ -23,10 +23,24 @@ enum IntegerSize {
   Int_Unspecified,
 }
 
+fn integer_size(size: IntegerSize) -> u32 {
+  if size == IntegerSize::I8  return 8;
+  else if size == IntegerSize::I16  return 16;
+  else if size == IntegerSize::I32  return 32;
+  else if size == IntegerSize::I64  return 64;
+  else abort();
+}
+
 enum FloatingSize {
   F32,
   F64,
   Float_Unspecified,
+}
+
+fn floating_size(size: FloatingSize) -> u32 {
+  if size == FloatingSize::F32  return 32;
+  else if size == FloatingSize::F64  return 64;
+  else abort();
 }
 
 enum PrimitiveTyKind {

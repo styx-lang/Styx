@@ -89,18 +89,31 @@ fn mangle_function_name(ctx: *CodegenContext, module: *Module, ident: Ident, hea
   mangle_path_and_ident(ctx, module.path, ident);
 }
 
-fn generate_type(ctx: *CodegenContext, ty: *AstType) {
-  if ty.kind == AstTypeKind::Path {
-    mangle_path(ctx, ty.node.path);
+fn generate_ty(ctx: *CodegenContext, ty: *Ty) {
+  if ty.kind == TyKind::Void || ty.kind == TyKind::ConstVoid  fprintf(ctx.out, " void");
+  else if ty.kind == TyKind::Char || ty.kind == TyKind::ConstChar  fprintf(ctx.out, " char");
+  else if ty.kind == TyKind::Bool  fprintf(ctx.out, " bool");
+  else if ty.kind == TyKind::Signed || ty.kind == TyKind::Unsigned {
+    if ty.kind == TyKind::Signed {
+      fprintf(ctx.out , " i");
+    } else if ty.kind == TyKind::Unsigned {
+      fprintf(ctx.out , " u");
+    }
+    fprintf(ctx.out, "%u", integer_size(ty.node.integer));
   }
-  else if ty.kind == AstTypeKind::Ptr {
-    generate_type(ctx, ty.node.ptr);
+  else if ty.kind == TyKind::Floating {
+    fprintf(ctx.out, " f%u", floating_size(ty.node.floating));
+  }
+  else if ty.kind == TyKind::Ptr {
+    generate_ty(ctx, ty.node.ptr);
     fprintf(ctx.out, "* ");
   }
-  else if ty.kind == AstTypeKind::Void {
-    fprintf(ctx.out, "void ");
+  else if ty.kind == TyKind::Struct || ty.kind == TyKind::Union {
+    mangle_path(ctx, ty.node.compound.path);
   }
-  else abort();
+  else if ty.kind == TyKind::Enum {
+    mangle_path(ctx, ty.node._enum.path);
+  } else abort();
 }
 
 fn generate_char(ctx: *CodegenContext, c: char) {
@@ -245,7 +258,7 @@ fn generate_control_flow(ctx: *CodegenContext, is_continue: bool) {
 
 fn generate_let(ctx: *CodegenContext, data: LetData) {
 
-  generate_type(ctx, data.ast_ty);
+  generate_ty(ctx, data.ty);
 
   var var_name: *char = get_str(ctx.interner, data.pat.ident.name);
 
@@ -259,8 +272,11 @@ fn generate_let(ctx: *CodegenContext, data: LetData) {
 }
 
 fn generate_cast(ctx: *CodegenContext, data: CastData) {
-  //generate_ty(ctx, data.ty);
+  fprintf(ctx.out, "((");
+  generate_ty(ctx, data.ty);
+  fprintf(ctx.out, ")(");
   generate_expr(ctx, data.inner);
+  fprintf(ctx.out, "))");
 }
 
 fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
@@ -301,7 +317,7 @@ fn generate_variable(ctx: *CodegenContext, item: *Item) {
 
   emit_line_directive(ctx.out, ctx.source, item.span);
 
-  generate_type(ctx, item.node.variable.ast_ty);
+  generate_ty(ctx, item.node.variable.ty);
 
   var var_name: *char = get_str(ctx.interner, item.ident.name);
 
@@ -322,7 +338,11 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 
   val func: FunctionData = item.node.function;
   val header: FunctionHeader = func.header;
-  generate_type(ctx, header.output_ast_ty);
+
+  val fn_ty: *Ty = header.ty;
+  val fn_def: FnDef = fn_ty.node.function;
+
+  generate_ty(ctx, fn_def.output);
 
   if item.should_mangle  mangle_function_name(ctx, ctx.current_module, item.ident, header);
   else  fprintf(ctx.out, " %s", get_str(ctx.interner, item.ident.name));
@@ -330,13 +350,13 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
 
   var i: u32 = 0;
   while i < header.num_parameters {
-    var ty: *AstType = header.parameters[i].ast_ty;
-    if ty.kind == AstTypeKind::Variadic {
+    var ty: *Ty = fn_def.parameters[i];
+    if ty.kind == TyKind::Variadic {
       fprintf(ctx.out, "...");
       break;
     }
 
-    generate_type(ctx, ty);
+    generate_ty(ctx, ty);
 
     var param_name: *char = get_str(ctx.interner, header.parameters[i].pat.ident.name);
     strmap_insert(ctx.ident_is_ptr, param_name, type_is_ptr(header.parameters[i].ast_ty));
@@ -387,6 +407,9 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
   mangle_path_and_ident(ctx, module.path, item.ident);
   fprintf(ctx.out, ";\n");
 
+  val compound_ty: *Ty = data.ty;
+  val def: *CompoundDef = &compound_ty.node.compound;
+
   emit_line_directive(ctx.out, ctx.source, item.span);
   if data.num_fields > 0 {
     fprintf(ctx.out, "typedef %s", compound_kind);
@@ -394,7 +417,7 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
     fprintf(ctx.out, " {\n");
     var i: u32 = 0;
     while i < data.num_fields {
-      generate_type(ctx, data.fields[i].ast_ty);
+      generate_ty(ctx, def.fields[i].ty);
 
       var field_name: *char = get_str(ctx.interner, data.fields[i].ident.name);
       fprintf(ctx.out, " %s;\n", field_name);
