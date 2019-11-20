@@ -461,6 +461,19 @@ fn parse_control_flow(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
+fn parse_cast(ctx: *ParsingContext) -> *Expr {
+  expect(ctx, TokenKind::Cast);
+  expect(ctx, TokenKind::LeftParen);
+
+  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Cast);
+  expr.node._cast.inner = parse_expression(ctx, 0);
+  expect(ctx, TokenKind::Comma);
+  expr.node._cast.ast_ty = parse_type(ctx);
+  expect(ctx, TokenKind::RightParen);
+
+  return expr;
+}
+
 fn parse_return(ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::Return);
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Return);
@@ -484,6 +497,7 @@ fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
   else if (tok.kind == TokenKind::Minus || tok.kind == TokenKind::Bang ||
            tok.kind == TokenKind::And || tok.kind == TokenKind::Star) left = parse_prefix_operator(ctx);
   else if tok.kind == TokenKind::If  left = parse_if(ctx);
+  else if tok.kind == TokenKind::Cast  left = parse_cast(ctx);
   else if tok.kind == TokenKind::Sizeof  left = parse_sizeof(ctx);
   else if tok.kind == TokenKind::While  left = parse_while(ctx);
   else if tok.kind == TokenKind::Continue || tok.kind == TokenKind::Break  left = parse_control_flow(ctx);

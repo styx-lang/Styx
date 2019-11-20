@@ -9,6 +9,7 @@ enum TokenKind {
 
     //Keywords
     Break,
+    Cast,
     Const,
     Continue,
     Defer,

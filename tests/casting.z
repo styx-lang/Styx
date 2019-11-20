@@ -1,0 +1,7 @@
+extern fn printf(format: *constchar, args: ...) -> i32
+
+fn main() {
+  var a: f32 = 4.2;
+  var b: i32 = cast(a, i32);
+  printf("%.1f - %d\n", a, b);
+}

@@ -98,6 +98,7 @@ fn is_keyword(s: *char) -> TokenKind {
   //TODO Replace this with a match
 
   if !strcmp(s, "break")  return TokenKind::Break;
+  if !strcmp(s, "cast")  return TokenKind::Cast;
   if !strcmp(s, "continue")  return TokenKind::Continue;
   if !strcmp(s, "const")  return TokenKind::Continue;
   if !strcmp(s, "defer")  return TokenKind::Defer;
