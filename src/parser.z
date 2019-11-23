@@ -368,6 +368,8 @@ parse_infix_operator :: (ctx: *ParsingContext, left: *Expr, tok: Token) -> *Expr
   return null;
 }
 
+parse_stmt :: (ctx: *ParsingContext) -> *Expr;
+
 parse_block :: (ctx: *ParsingContext) -> *Block {
 
   var block : *Block = malloc(sizeof(Block));
@@ -380,12 +382,12 @@ parse_block :: (ctx: *ParsingContext) -> *Block {
     expect(ctx, TokenKind::LeftCurly);
     var i: u32 = 0;
     while !accept(ctx, TokenKind::RightCurly) {
-      block.exprs[i] = parse_expression(ctx, 0);
+      block.exprs[i] = parse_stmt(ctx);
       block.num_exprs = block.num_exprs + 1;
       i = i + 1;
     }
   } else {
-    block.exprs[0] = parse_expression(ctx, 0);
+    block.exprs[0] = parse_stmt(ctx);
     block.num_exprs = 1;
   }
   block.span.to = span_end(ctx);
@@ -499,10 +501,6 @@ parse_expression :: (ctx: *ParsingContext, precedence: u32) -> *Expr {
   else if tok.kind == TokenKind::If  left = parse_if(ctx);
   else if tok.kind == TokenKind::Cast  left = parse_cast(ctx);
   else if tok.kind == TokenKind::Sizeof  left = parse_sizeof(ctx);
-  else if tok.kind == TokenKind::While  left = parse_while(ctx);
-  else if tok.kind == TokenKind::Continue || tok.kind == TokenKind::Break  left = parse_control_flow(ctx);
-  else if tok.kind == TokenKind::Return  left = parse_return(ctx);
-  else if tok.kind == TokenKind::Var || tok.kind == TokenKind::Val  left = parse_let(ctx);
   else if tok.kind == TokenKind::Identifier  left = parse_path_expr(ctx);
   else if tok.kind == TokenKind::LeftParen {
     expect(ctx, TokenKind::LeftParen);
@@ -519,9 +517,29 @@ parse_expression :: (ctx: *ParsingContext, precedence: u32) -> *Expr {
   span.to = span_end(ctx);
   left.span = span;
 
+  return left;
+}
+
+parse_stmt :: (ctx: *ParsingContext) -> *Expr {
+
+  val tok: Token = look_ahead(ctx, 0);
+  var span: Span;
+  span.from = span_start(ctx);
+
+  var stmt: *Expr;
+
+  if tok.kind == TokenKind::While  stmt = parse_while(ctx);
+  else if tok.kind == TokenKind::Continue || tok.kind == TokenKind::Break  stmt = parse_control_flow(ctx);
+  else if tok.kind == TokenKind::Return  stmt = parse_return(ctx);
+  else if tok.kind == TokenKind::Var || tok.kind == TokenKind::Val  stmt = parse_let(ctx);
+  else stmt = parse_expression(ctx, 0);
+
+  span.to = span_end(ctx);
+  stmt.span = span;
+
   accept(ctx, TokenKind::Semicolon);
 
-  return left;
+  return stmt;
 }
 
 parse_generics :: (ctx: *ParsingContext) -> Generics {
@@ -555,14 +573,12 @@ parse_variable_decl :: (ctx: *ParsingContext, item: *Item) {
 
 parse_compound_decl :: (ctx: *ParsingContext, item: *Item) {
 
-  if accept(ctx, TokenKind::Struct)  item.kind = ItemKind::Struct;
-  else if accept(ctx, TokenKind::Union)  item.kind = ItemKind::Union;
-
   item.ident = parse_identifier(ctx);
 
-  accept(ctx, TokenKind::ColonColon);
+  expect(ctx, TokenKind::ColonColon);
   if accept(ctx, TokenKind::Struct)  item.kind = ItemKind::Struct;
   else if accept(ctx, TokenKind::Union)  item.kind = ItemKind::Union;
+  else  abort();
 
   if can_accept(ctx, TokenKind::Less)  item.node.compound.generics = parse_generics(ctx);
   else  item.node.compound.generics.num_parameters = 0;
@@ -589,13 +605,11 @@ parse_compound_decl :: (ctx: *ParsingContext, item: *Item) {
 
 parse_enum_decl :: (ctx: *ParsingContext, item: *Item) {
 
-  accept(ctx, TokenKind::Enum);
   item.kind = ItemKind::Enum;
-
   item.ident = parse_identifier(ctx);
 
-  accept(ctx, TokenKind::ColonColon);
-  accept(ctx, TokenKind::Enum);
+  expect(ctx, TokenKind::ColonColon);
+  expect(ctx, TokenKind::Enum);
 
   expect(ctx, TokenKind::LeftCurly);
 
@@ -648,11 +662,9 @@ parse_function_decl :: (ctx: *ParsingContext, item: *Item) {
 
   item.kind = ItemKind::Function;
 
-  accept(ctx, TokenKind::Fn);
-
   item.ident = parse_identifier(ctx);
 
-  accept(ctx, TokenKind::ColonColon);
+  expect(ctx, TokenKind::ColonColon);
 
   var sess: *Session = ctx.sess;
   if item.ident.name.x == intern(&sess.interner, "main").x  item.should_mangle = false;
@@ -790,7 +802,7 @@ create_root_module :: (sess: *Session, ast: *Ast, path: *char) -> *Module {
   main_item.kind = ItemKind::Module;
   main_item.ident.name = intern(&sess.interner, path);
 
-  var main_module: *Module = parse_mod_external(sess, ast, path, module);;
+  var main_module: *Module = parse_mod_external(sess, ast, path, module);
   main_item.span.from = main_module.span.from;
   main_item.span.to = main_module.span.to;
   main_item.node.module = main_module;
