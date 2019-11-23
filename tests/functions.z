@@ -1,25 +1,25 @@
-extern fn printf(format: *constchar, args: ...) -> i32
+extern printf :: (format: *constchar, args: ...) -> i32
 
-fn A() {
+A :: () {
   printf("A\n");
 }
 
-fn B(a: u32, b: u32) -> u32 {
+B :: (a: u32, b: u32) -> u32 {
   printf("B: %u %u\n", a, b);
   return a + b;
 }
 
-fn C(a: *u32, b: u32) {
+C :: (a: *u32, b: u32) {
   *a = 12;
   b = 13;
 }
 
-fn D(n: u32) -> u32 {
+D :: (n: u32) -> u32 {
   if n == 1 || n == 2  return 1;
   else  return D(n-1) + D(n-2);
 }
 
-fn main() {
+main :: () {
   A();
 
   var b: u32 = B(2, 3);

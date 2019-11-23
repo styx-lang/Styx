@@ -1,10 +1,10 @@
-extern fn printf(format: *constchar, args: ...) -> i32
+extern printf :: (format: *constchar, args: ...) -> i32
 
-fn f<T>(T: t) -> T {
+f<T> :: (T: t) -> T {
   return t;
 }
 
-fn main() {
+main :: () {
   var a: u32 = 2;
   printf("%u\n", f(a));
 }

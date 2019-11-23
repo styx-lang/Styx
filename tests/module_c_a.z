@@ -1,4 +1,4 @@
 
-fn C_A() {
+C_A :: () {
   printf("C_A\n");
 }

@@ -1,4 +1,4 @@
-extern fn printf(format: *constchar, args: ...) -> i32
+extern printf :: (format: *constchar, args: ...) -> i32
 
 struct A {
   x: u32,
@@ -10,7 +10,7 @@ struct B {
   p: *A,
 }
 
-fn main() {
+main :: () {
   var a: A;
   a.x = 42;
   a.y = 12;

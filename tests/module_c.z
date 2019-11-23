@@ -1,6 +1,6 @@
 
 mod module_c_a;
 
-fn C() {
+C :: () {
   printf("C\n");
 }

@@ -1,6 +1,6 @@
-extern fn printf(format: *constchar, args: ...) -> i32
+extern printf :: (format: *constchar, args: ...) -> i32
 
-fn main() {
+main :: () {
   var u: u32 = 42;
   printf("%u\n", u);
   var i: i32 = -12;

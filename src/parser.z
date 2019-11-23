@@ -541,13 +541,12 @@ fn parse_generics(ctx: *ParsingContext) -> Generics {
 
 fn parse_variable_decl(ctx: *ParsingContext, item: *Item) {
 
-  val keyword: Token = consume(ctx);
-  if keyword.kind == TokenKind::Val  item.kind = ItemKind::Const;
-  else if keyword.kind == TokenKind::Var  item.kind = ItemKind::Variable;
-  else abort();
+  if accept(ctx, TokenKind::Val)  item.kind = ItemKind::Const;
+  else if accept(ctx, TokenKind::Var)  item.kind = ItemKind::Variable;
 
   item.ident = parse_identifier(ctx);
-  expect(ctx, TokenKind::Colon);
+  if accept(ctx, TokenKind::ColonColon)  item.kind = ItemKind::Const;
+  else if accept(ctx, TokenKind::Colon)  item.kind = ItemKind::Variable;
   item.node.variable.ast_ty = parse_type(ctx);
 
   if accept(ctx, TokenKind::Equal)  item.node.variable.body = parse_expression(ctx, 0);
@@ -558,9 +557,12 @@ fn parse_compound_decl(ctx: *ParsingContext, item: *Item) {
 
   if accept(ctx, TokenKind::Struct)  item.kind = ItemKind::Struct;
   else if accept(ctx, TokenKind::Union)  item.kind = ItemKind::Union;
-  else abort();
 
   item.ident = parse_identifier(ctx);
+
+  accept(ctx, TokenKind::ColonColon);
+  if accept(ctx, TokenKind::Struct)  item.kind = ItemKind::Struct;
+  else if accept(ctx, TokenKind::Union)  item.kind = ItemKind::Union;
 
   if can_accept(ctx, TokenKind::Less)  item.node.compound.generics = parse_generics(ctx);
   else  item.node.compound.generics.num_parameters = 0;
@@ -587,10 +589,13 @@ fn parse_compound_decl(ctx: *ParsingContext, item: *Item) {
 
 fn parse_enum_decl(ctx: *ParsingContext, item: *Item) {
 
-  expect(ctx, TokenKind::Enum);
+  accept(ctx, TokenKind::Enum);
   item.kind = ItemKind::Enum;
 
   item.ident = parse_identifier(ctx);
+
+  accept(ctx, TokenKind::ColonColon);
+  accept(ctx, TokenKind::Enum);
 
   expect(ctx, TokenKind::LeftCurly);
 
@@ -643,9 +648,11 @@ fn parse_function_decl(ctx: *ParsingContext, item: *Item) {
 
   item.kind = ItemKind::Function;
 
-  expect(ctx, TokenKind::Fn);
+  accept(ctx, TokenKind::Fn);
 
   item.ident = parse_identifier(ctx);
+
+  accept(ctx, TokenKind::ColonColon);
 
   var sess: *Session = ctx.sess;
   if item.ident.name.x == intern(&sess.interner, "main").x  item.should_mangle = false;
@@ -698,6 +705,14 @@ fn parse_item(ctx: *ParsingContext) -> *Item {
   else if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  parse_variable_decl(ctx, item);
   else if tok.kind == TokenKind::Use  parse_use(ctx, item);
   else if tok.kind == TokenKind::Mod  parse_mod(ctx, item);
+  else if tok.kind == TokenKind::Identifier {
+    val next: Token = look_ahead(ctx, 2);
+    if next.kind == TokenKind::Struct || next.kind == TokenKind::Union  parse_compound_decl(ctx, item);
+    else if next.kind == TokenKind::Enum  parse_enum_decl(ctx, item);
+    else if next.kind == TokenKind::Var  parse_variable_decl(ctx, item);
+    else if next.kind == TokenKind::LeftParen  parse_function_decl(ctx, item);
+    else  emit_error(ctx.source_map, tok.span, "Unexpected token on top-level");
+  }
   else  emit_error(ctx.source_map, tok.span, "Unexpected token on top-level");
 
   accept(ctx, TokenKind::Semicolon);
