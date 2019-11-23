@@ -1,6 +1,8 @@
 
-use super::interning::Interner;
-use super::source_map::SourceMap;
+use super::interning::*;
+use super::source_map::*;
+
+SidBump1 :: struct {}
 
 Session :: struct {
   interner: Interner,

@@ -20,24 +20,24 @@ interner_create :: () -> Interner {
 }
 
 
-intern :: (self: *Interner, string: *char) -> Sid  {
+intern :: (interner: *Interner, string: *char) -> Sid  {
   sid: Sid;
-  sid.x = strmap_lookup(self.str_lookup, string);
+  sid.x = strmap_lookup(interner.str_lookup, string);
   if sid.x == 0 {
 
-    sid.x = self.next_sid;
-    self.next_sid = self.next_sid + 1;
+    sid.x = interner.next_sid;
+    interner.next_sid = interner.next_sid + 1;
 
     len: u64 = strlen(string) + 1;
     copy: *char = malloc(len);
     memcpy(copy, string, len);
-    self.sid_lookup[sid.x] = copy;
+    interner.sid_lookup[sid.x] = copy;
 
-    strmap_insert(self.str_lookup, copy, sid.x);
+    strmap_insert(interner.str_lookup, copy, sid.x);
   };
   return sid;
 }
 
-get_str :: (self: *Interner, sid: Sid) -> *char {
-  return self.sid_lookup[sid.x];
+get_str :: (interner: *Interner, sid: Sid) -> *char {
+  return interner.sid_lookup[sid.x];
 }

@@ -1,5 +1,4 @@
-
-mod module_c_a;
+extern printf :: (format: *constchar, args: ...) -> i32
 
 C :: () {
   printf("C\n");

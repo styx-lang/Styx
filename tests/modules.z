@@ -1,24 +1,13 @@
 extern printf :: (format: *constchar, args: ...) -> i32
 
-mod module_a {
-  use super::printf;
-  A :: () {
-    printf("A\n");
-  }
-}
-
 mod module_b;
 mod module_c;
 
-use self::module_a::A;
 use self::module_b::*;
 use self::module_c::C;
-use self::module_c::module_c_a::C_A;
 
 main :: () {
-  A();
   B1();
   B2();
   C();
-  C_A();
 }

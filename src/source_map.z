@@ -40,9 +40,9 @@ load_file_content :: (file: *SourceFile) {
   fclose(fp);
 }
 
-source_map_new_file :: (self: *SourceMap, path: *char, filename: *char) -> *SourceFile {
-  file: *SourceFile = &self.files[self.num_files];
-  self.num_files = self.num_files + 1;
+source_map_new_file :: (map: *SourceMap, path: *char, filename: *char) -> *SourceFile {
+  file: *SourceFile = &map.files[map.num_files];
+  map.num_files = map.num_files + 1;
 
   needed_length: u32 = strlen(path) + strlen(filename) + 4;
 
@@ -54,23 +54,23 @@ source_map_new_file :: (self: *SourceMap, path: *char, filename: *char) -> *Sour
   file.lines = calloc(sizeof(u32), 4096);
   file.num_lines = 1;
 
-  if self.num_files > 1  file.start = self.files[self.num_files - 2].end;
+  if map.num_files > 1  file.start = map.files[map.num_files - 2].end;
   else  file.start = 0;
 
-  self.file_starts[self.num_files - 1] = file.start;
+  map.file_starts[map.num_files - 1] = file.start;
 
   load_file_content(file);
 
   return file;
 }
 
-source_file_newline :: (self: *SourceFile, position: u32) {
-  self.lines[self.num_lines] = self.start + position;
-  self.num_lines = self.num_lines + 1;
+source_file_newline :: (file: *SourceFile, position: u32) {
+  file.lines[file.num_lines] = file.start + position;
+  file.num_lines = file.num_lines + 1;
 }
 
-source_file_done :: (self: *SourceFile, length: u32) {
-  self.end = self.start + length;
+source_file_done :: (file: *SourceFile, length: u32) {
+  file.end = file.start + length;
 }
 
 source_map_info :: (m: *SourceMap, span: Span, first: *u32, last: *u32) -> *SourceFile {

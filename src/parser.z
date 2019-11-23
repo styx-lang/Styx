@@ -7,15 +7,16 @@ use super::error::*;
 use super::tokens::*;
 use super::lexer::*;
 use super::ast::*;
+use super::session::*;
 
 ParsingContext :: struct {
   current_token: u64,
+  interner: *Interner,
   tokens: *Token,
   num_tokens: u64,
   source_map: *SourceMap,
   sess: *Session,
-  current_module: *Module,
-  ast: *Ast,
+  module: *Module,
 }
 
 is_done_parsing :: (ctx: *ParsingContext) -> bool {
@@ -91,12 +92,12 @@ parse_path :: (ctx: *ParsingContext) -> Path {
   path.span.from = span_start(ctx);
 
   while true {
-    if accept(ctx, TokenKind::Star) {
-      path.segments[path.num_segments].name.x = 0;
-    } else {
-      path.segments[path.num_segments] = parse_identifier(ctx);
-    }
-    path.num_segments = path.num_segments + 1;
+    if accept(ctx, TokenKind::Star)  break; //TODO: Remove
+
+    path.segments[path.num_segments] = parse_identifier(ctx);
+    if path.segments[path.num_segments].name.x == intern(ctx.interner, "self").x || path.segments[path.num_segments].name.x == intern(ctx.interner, "super").x {}
+    else path.num_segments = path.num_segments + 1;
+
     if !accept(ctx, TokenKind::ColonColon)  break;
   }
 
@@ -105,7 +106,7 @@ parse_path :: (ctx: *ParsingContext) -> Path {
 }
 
 parse_path_expr :: (ctx: *ParsingContext) -> *Expr {
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Path);
+  expr: *Expr = create_expr(ExprKind::Path);
   expr.node.path = parse_path(ctx);
   return expr;
 }
@@ -114,7 +115,7 @@ parse_pattern :: (ctx: *ParsingContext) -> Pattern {
   pat: Pattern;
   pat.span.from = span_start(ctx);
   pat.ident = parse_identifier(ctx);
-  pat.span.to = span_start(ctx);
+  pat.span.to = span_end(ctx);
   return pat;
 }
 
@@ -208,7 +209,7 @@ parse_integer_literal :: (ctx: *ParsingContext) -> *Expr {
 
   tok: Token = expect(ctx, TokenKind::Integer);
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
+  expr: *Expr = create_expr(ExprKind::Literal);
   expr.node.lit.kind = LiteralKind::Int;
 
   sess: *Session = ctx.sess;
@@ -220,7 +221,7 @@ parse_float_literal :: (ctx: *ParsingContext) -> *Expr {
 
   tok: Token = expect(ctx, TokenKind::Float);
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
+  expr: *Expr = create_expr(ExprKind::Literal);
   expr.node.lit.kind = LiteralKind::Float;
 
   sess: *Session = ctx.sess;
@@ -232,7 +233,7 @@ parse_char_literal :: (ctx: *ParsingContext) -> *Expr {
 
   tok: Token = expect(ctx, TokenKind::Char);
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
+  expr: *Expr = create_expr(ExprKind::Literal);
   expr.node.lit.kind = LiteralKind::Char;
 
   sess: *Session = ctx.sess;
@@ -260,7 +261,7 @@ parse_string_literal :: (ctx: *ParsingContext) -> *Expr {
 
   tok: Token = expect(ctx, TokenKind::String);
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
+  expr: *Expr = create_expr(ExprKind::Literal);
   expr.node.lit.kind = LiteralKind::Str;
 
   expr.node.lit.value.str = tok.lexeme;
@@ -271,7 +272,7 @@ parse_bool_literal :: (ctx: *ParsingContext) -> *Expr {
 
   tok: Token = consume(ctx);
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
+  expr: *Expr = create_expr(ExprKind::Literal);
   expr.node.lit.kind = LiteralKind::Bool;
   expr.node.lit.value.boolean = tok.kind == TokenKind::True;
   return expr;
@@ -279,7 +280,7 @@ parse_bool_literal :: (ctx: *ParsingContext) -> *Expr {
 
 parse_call :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 
-  result: *Expr = ast_create_expr(ctx.ast, ExprKind::Call);
+  result: *Expr = create_expr(ExprKind::Call);
   result.node.call.func = left;
   result.node.call.args = malloc(8 * 16);
   result.node.call.num_args = 0;
@@ -299,7 +300,7 @@ parse_call :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 }
 
 parse_prefix_operator :: (ctx: *ParsingContext) -> *Expr {
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Unary);
+  expr: *Expr = create_expr(ExprKind::Unary);
 
   tok: Token = consume(ctx);
 
@@ -318,7 +319,7 @@ parse_binary_operator :: (ctx: *ParsingContext, left: *Expr, operator: BinaryOpe
   precedence: u32 = get_binary_operator_precedence(operator);
   right: *Expr = parse_expression(ctx, precedence);
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Binary);
+  expr: *Expr = create_expr(ExprKind::Binary);
   expr.node.binary.op = operator;
   expr.node.binary.left = left;
   expr.node.binary.right = right;
@@ -327,7 +328,7 @@ parse_binary_operator :: (ctx: *ParsingContext, left: *Expr, operator: BinaryOpe
 }
 
 parse_field_access :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Field);
+  expr: *Expr = create_expr(ExprKind::Field);
   expr.node.field.ident = parse_identifier(ctx);
   expr.node.field.strct = left;
 
@@ -336,7 +337,7 @@ parse_field_access :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 
 parse_indexing :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Indexing);
+  expr: *Expr = create_expr(ExprKind::Indexing);
   expr.node.indexing.index = parse_expression(ctx, 0);
   expr.node.indexing.array = left;
 
@@ -346,7 +347,7 @@ parse_indexing :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 }
 
 parse_assignment :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Assignment);
+  expr: *Expr = create_expr(ExprKind::Assignment);
   expr.node.assignment.left = left;
   expr.node.assignment.right = parse_expression(ctx, 0);
 
@@ -396,7 +397,7 @@ parse_block :: (ctx: *ParsingContext) -> *Block {
 }
 
 parse_block_expr :: (ctx: *ParsingContext) -> *Expr {
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Block);
+  expr: *Expr = create_expr(ExprKind::Block);
   expr.node.block = parse_block(ctx);
   return expr;
 }
@@ -405,7 +406,7 @@ parse_if :: (ctx: *ParsingContext) -> *Expr {
 
   expect(ctx, TokenKind::If);
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Conditional);
+  expr: *Expr = create_expr(ExprKind::Conditional);
   expr.node.conditional.condition = parse_expression(ctx, 0);
   expr.node.conditional.then = parse_block_expr(ctx);
 
@@ -421,7 +422,7 @@ parse_if :: (ctx: *ParsingContext) -> *Expr {
 parse_while :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::While);
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::While);
+  expr: *Expr = create_expr(ExprKind::While);
   expr.node.whl.condition = parse_expression(ctx, 0);
   expr.node.whl.body = parse_block_expr(ctx);
 
@@ -432,7 +433,7 @@ parse_sizeof :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::Sizeof);
   expect(ctx, TokenKind::LeftParen);
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Sizeof);
+  expr: *Expr = create_expr(ExprKind::Sizeof);
   expr.node._sizeof = parse_expression(ctx, 0);
   expect(ctx, TokenKind::RightParen);
 
@@ -441,7 +442,7 @@ parse_sizeof :: (ctx: *ParsingContext) -> *Expr {
 
 parse_local_variable :: (ctx: *ParsingContext) -> *Expr {
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Local);
+  expr: *Expr = create_expr(ExprKind::Local);
   expr.node.local.pat = parse_pattern(ctx);
   expect(ctx, TokenKind::Colon);
 
@@ -455,7 +456,7 @@ parse_local_variable :: (ctx: *ParsingContext) -> *Expr {
 
 
 parse_control_flow :: (ctx: *ParsingContext) -> *Expr {
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::ControlFlow);
+  expr: *Expr = create_expr(ExprKind::ControlFlow);
   expr.node.control_flow_is_continue = accept(ctx, TokenKind::Continue);
 
   if !expr.node.control_flow_is_continue  expect(ctx, TokenKind::Break);
@@ -467,7 +468,7 @@ parse_cast :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::Cast);
   expect(ctx, TokenKind::LeftParen);
 
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Cast);
+  expr: *Expr = create_expr(ExprKind::Cast);
   expr.node._cast.inner = parse_expression(ctx, 0);
   expect(ctx, TokenKind::Comma);
   expr.node._cast.ast_ty = parse_type(ctx);
@@ -478,7 +479,7 @@ parse_cast :: (ctx: *ParsingContext) -> *Expr {
 
 parse_return :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::Return);
-  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Return);
+  expr: *Expr = create_expr(ExprKind::Return);
   expr.node._return = parse_expression(ctx, 0);
 
   return expr;
@@ -686,35 +687,19 @@ parse_use :: (ctx: *ParsingContext, item: *Item) {
   accept(ctx, TokenKind::Semicolon);
 }
 
-parse_mod_inner :: (ctx: *ParsingContext, name: Ident) -> *Module
-parse_mod_external :: (sess: *Session, ast: *Ast, path: *char, parent: *Module) -> *Module
+parse_item :: (ctx: *ParsingContext, item: *Item) {
 
-parse_mod :: (ctx: *ParsingContext, item: *Item) {
-  expect(ctx, TokenKind::Mod);
-
-  item.ident = parse_identifier(ctx);
-  item.kind = ItemKind::Module;
-
-  if accept(ctx, TokenKind::LeftCurly)  item.node.module = parse_mod_inner(ctx, item.ident);
-  else {
-    sess: *Session = ctx.sess;
-    path: *char = get_str(&sess.interner, item.ident.name);
-    item.node.module = parse_mod_external(ctx.sess, ctx.ast, path, ctx.current_module);
-  }
-}
-
-
-parse_item :: (ctx: *ParsingContext) -> *Item {
-
-  item: *Item = ast_create_item(ctx.ast);
   item.span.from = span_start(ctx);
   item.should_mangle = !accept(ctx, TokenKind::Extern);
 
   tok : Token = look_ahead(ctx, 0);
+  while tok.kind == TokenKind::Mod  {
+    consume(ctx); consume(ctx); consume(ctx);
+    tok = look_ahead(ctx, 0);
+  }
 
   if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  parse_variable_decl(ctx, item);
   else if tok.kind == TokenKind::Use  parse_use(ctx, item);
-  else if tok.kind == TokenKind::Mod  parse_mod(ctx, item);
   else if tok.kind == TokenKind::Identifier {
     next: Token = look_ahead(ctx, 2);
     if next.kind == TokenKind::Struct || next.kind == TokenKind::Union  parse_compound_decl(ctx, item);
@@ -727,100 +712,44 @@ parse_item :: (ctx: *ParsingContext) -> *Item {
   accept(ctx, TokenKind::Semicolon);
 
   item.span.to = span_end(ctx);
-  return item;
 }
 
-parse_mod_inner :: (ctx: *ParsingContext, name: Ident) -> *Module {
-  module: *Module = malloc(sizeof(Module));
-  module.span.from = span_start(ctx);
-  module.items = malloc(8 * 2048);
-  module.num_items = 0;
-  module.index_lookup = intmap_create(2048);
-  module.index = malloc(sizeof(IndexEntry) * 2048);
-  module.num_indices = 1;
-  module.parent = ctx.current_module;
+parse :: (sess: *Session, source: *SourceFile, name: Sid, parent: *Module) -> *Module {
 
-  parent: *Module = module.parent;
+  module: *Module = malloc(sizeof(Module));
+  module.items = malloc(sizeof(Item) * 2048);
+  module.num_items = 0;
+  module.parent = null;
 
   if parent  module.path.num_segments = parent.path.num_segments + 1;
   else  module.path.num_segments = 1;
 
   module.path.segments = malloc(sizeof(Ident) * module.path.num_segments);
   if parent  memcpy(module.path.segments, parent.path.segments, parent.path.num_segments * sizeof(Ident));
-  module.path.segments[module.path.num_segments - 1] = name;
+  module.path.segments[module.path.num_segments - 1].name = name;
 
-  ctx.current_module = module;
-
-  while !accept(ctx, TokenKind::RightCurly) && !is_done_parsing(ctx) {
-    module.items[module.num_items] = parse_item(ctx);
-    module.num_items = module.num_items + 1;
-  }
-
-  module.span.to = span_end(ctx);
-
-  ctx.current_module = module.parent;
-
-  return module;
-}
-
-parse_mod_external :: (sess: *Session, ast: *Ast, path: *char, parent: *Module) -> *Module {
-
-  source_file: *SourceFile = source_map_new_file(&sess.source, sess.root_path, path);
+  module.path.binding.node.module = module;
 
   num_tokens: u32;
-  tokens: *Token = lex(sess, source_file, &num_tokens);
+  tokens: *Token = lex(sess, source, &num_tokens);
 
   ctx: ParsingContext;
   ctx.current_token = 0;
   ctx.tokens = tokens;
   ctx.num_tokens = num_tokens;
   ctx.source_map = &sess.source;
+  ctx.interner = &sess.interner;
   ctx.sess = sess;
-  ctx.ast = ast;
-  ctx.current_module = parent;
+  ctx.module = module;
 
-  name_ident: Ident;
-  name_ident.name = intern(&sess.interner, path);
-  name_ident.span.from = 0;
-  name_ident.span.to = 0;
+  module.span.from = span_start(&ctx);
 
-  module: *Module = parse_mod_inner(&ctx, name_ident);
+  while !accept(&ctx, TokenKind::RightCurly) && !is_done_parsing(&ctx) {
+    parse_item(&ctx, &module.items[module.num_items]);
+    module.num_items = module.num_items + 1;
+  }
 
-  return module;
-}
-
-create_root_module :: (sess: *Session, ast: *Ast, path: *char) -> *Module {
-
-  module: *Module = malloc(sizeof(Module));
-  module.items = malloc(8 * 2048);
-  module.index_lookup = intmap_create(2048);
-  module.index = malloc(sizeof(IndexEntry) * 2048);
-  module.num_indices = 1;
-  module.parent = null;
-  module.path.num_segments = 0;
-
-  main_item: *Item = ast_create_item(ast);
-  main_item.kind = ItemKind::Module;
-  main_item.ident.name = intern(&sess.interner, path);
-
-  main_module: *Module = parse_mod_external(sess, ast, path, module);
-  main_item.span.from = main_module.span.from;
-  main_item.span.to = main_module.span.to;
-  main_item.node.module = main_module;
-  module.items[0] = main_item;
-  module.num_items = 1;
+  module.span.to = span_end(&ctx);
 
   return module;
-}
-
-parse :: (sess: *Session, root_module_name: *char) -> Ast {
-
-  ast: Ast;
-
-  ast.items = malloc(sizeof(Item) * 2048);
-  ast.num_items = 1; //Reserve zero idx for null item
-
-  ast.root_module = create_root_module(sess, &ast, root_module_name);
-
-  return ast;
 }

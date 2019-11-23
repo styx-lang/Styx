@@ -4,42 +4,27 @@ use super::interning::*;
 use super::source_map::*;
 use super::error::*;
 use super::ast::*;
+use super::session::*;
 
-VariableInfoKind :: enum {
-  Variable,
+SymbolInfoKind :: enum {
   Local,
   Parameter,
 }
 
-VariableInfoNode :: union {
+SymbolInfoNode :: union {
   local: *LocalData,
   parameter: *FunctionParameter,
 }
 
-VariableInfo :: struct {
+SymbolInfo :: struct {
   ident: Ident,
-  kind: VariableInfoKind,
-  node: VariableInfoNode,
-}
-
-VariableBlock :: struct {
-  variables: *VariableInfo,
-  num_variables: u32,
-}
-
-ScopeKind :: enum {
-  VariableBlock,
-  Module,
-}
-
-ScopeNode :: union {
-  module: *Module,
-  variable: VariableBlock,
+  kind: SymbolInfoKind,
+  node: SymbolInfoNode,
 }
 
 Scope :: struct {
-  kind: ScopeKind,
-  node: ScopeNode,
+  symbols: *SymbolInfo,
+  num_symbols: u32,
 }
 
 PrimitiveTypeSids :: struct {
@@ -60,14 +45,20 @@ PrimitiveTypeSids :: struct {
   _f64: Sid,
 }
 
+IndexEntry :: struct {
+  path: Path,
+}
+
 ResolutionContext :: struct {
   scope_stack: *Scope,
   stack_top: u32,
-  ast: *Ast,
   source_map: *SourceMap,
   interner: *Interner,
   root_module: *Module,
   primitive_ty_sids: PrimitiveTypeSids,
+  index_lookup: *IntMap,
+  index: *IndexEntry,
+  num_indices: u32,
 }
 
 setup_primitive_ty_sids :: (i: *Interner, p: *PrimitiveTypeSids) {
@@ -92,164 +83,74 @@ push_block :: (ctx: *ResolutionContext) {
   ctx.stack_top = ctx.stack_top + 1;
   scope: *Scope = &ctx.scope_stack[ctx.stack_top];
 
-  scope.kind = ScopeKind::VariableBlock;
-  scope.node.variable.variables = malloc(8*32);
-  scope.node.variable.num_variables = 0;
+  scope.symbols = malloc(8*32);
+  scope.num_symbols = 0;
 }
 
 pop_block :: (ctx: *ResolutionContext) {
   scope: *Scope = &ctx.scope_stack[ctx.stack_top];
-  free(scope.node.variable.variables);
+  free(scope.symbols);
   ctx.stack_top = ctx.stack_top - 1;
 }
 
 push_parameter :: (ctx: *ResolutionContext, ident: Ident, data: *FunctionParameter) {
   scope: *Scope = &ctx.scope_stack[ctx.stack_top];
-  if scope.kind != ScopeKind::VariableBlock  abort();
-  v: *VariableBlock = &scope.node.variable;
-  v.variables[v.num_variables].ident = ident;
-  v.variables[v.num_variables].kind = VariableInfoKind::Parameter;
-  v.variables[v.num_variables].node.parameter = data;
-  v.num_variables = v.num_variables + 1;
+  s: *SymbolInfo = &scope.symbols[scope.num_symbols];
+  s.ident = ident;
+  s.kind = SymbolInfoKind::Parameter;
+  s.node.parameter = data;
+  scope.num_symbols = scope.num_symbols + 1;
 }
 
 push_local :: (ctx: *ResolutionContext, ident: Ident, data: *LocalData) {
   scope: *Scope = &ctx.scope_stack[ctx.stack_top];
-  if scope.kind != ScopeKind::VariableBlock  abort();
-  v: *VariableBlock = &scope.node.variable;
-  v.variables[v.num_variables].ident = ident;
-  v.variables[v.num_variables].kind = VariableInfoKind::Local;
-  v.variables[v.num_variables].node.local = data;
-  v.num_variables = v.num_variables + 1;
+  s: *SymbolInfo = &scope.symbols[scope.num_symbols];
+  s.ident = ident;
+  s.kind = SymbolInfoKind::Local;
+  s.node.local = data;
+  scope.num_symbols = scope.num_symbols + 1;
 }
-
-push_module :: (ctx: *ResolutionContext, module: *Module) {
-  ctx.stack_top = ctx.stack_top + 1;
-  scope: *Scope = &ctx.scope_stack[ctx.stack_top];
-
-  scope.kind = ScopeKind::Module;
-  scope.node.module = module;
-}
-
-pop_module :: (ctx: *ResolutionContext) {
-  ctx.stack_top = ctx.stack_top - 1;
-}
-
-
 
 lookup :: (ctx: *ResolutionContext, ident: Ident) -> Path {
   i: i32 = ctx.stack_top;
   while i > 0 {
     scope: *Scope = &ctx.scope_stack[i];
-    if scope.kind == ScopeKind::Module {
-      module: *Module = scope.node.module;
-      idx: u32 = intmap_lookup(module.index_lookup, ident.name.x)
-      if idx > 0 {
-        entry: IndexEntry = module.index[idx];
-        return entry.path;
+    j: i32 = scope.num_symbols - 1;
+    while j >= 0 {
+      symbol: SymbolInfo = scope.symbols[j];
+      if symbol.ident.name.x == ident.name.x {
+          path: Path;
+          path.segments = malloc(sizeof(Ident));
+          path.segments[0] = symbol.ident;
+          path.num_segments = 1;
+          if symbol.kind == SymbolInfoKind::Local {
+            path.binding.kind = BindingKind::Local;
+            path.binding.node.local = symbol.node.local;
+          }
+          else if symbol.kind == SymbolInfoKind::Parameter {
+            path.binding.kind = BindingKind::Parameter;
+            path.binding.node.parameter = symbol.node.parameter;
+          }
+          return path;
       }
-    }
-    else if scope.kind == ScopeKind::VariableBlock {
-      block: *VariableBlock = &scope.node.variable;
-      j: i32 = block.num_variables - 1;
-      while j >= 0 {
-        variable: VariableInfo = block.variables[j];
-        if variable.ident.name.x == ident.name.x {
-            path: Path;
-            path.segments = malloc(sizeof(Ident));
-            path.segments[0] = variable.ident;
-            path.num_segments = 1;
-            if variable.kind == VariableInfoKind::Local {
-              path.binding.kind = BindingKind::Local;
-              path.binding.node.local = variable.node.local;
-            }
-            else if variable.kind == VariableInfoKind::Parameter {
-              path.binding.kind = BindingKind::Parameter;
-              path.binding.node.parameter = variable.node.parameter;
-            }
-            return path;
-        }
-        j = j - 1;
-      }
+      j = j - 1;
     }
     i = i - 1;
   }
+
+  idx: u32 = intmap_lookup(ctx.index_lookup, ident.name.x)
+  if idx > 0 {
+    entry: IndexEntry = ctx.index[idx];
+    return entry.path;
+  }
+
   emit_error(ctx.source_map, ident.span, "Unable to resolve item");
   abort();
 }
 
-index_use_binding :: (ctx: *ResolutionContext, path: Path) -> Binding {
-  cur_mod: *Module = ctx.root_module;
-  i: u32 = 0;
-  while true {
-    j: u32 = 0;
-    found: bool = false;
-    while j < cur_mod.num_items {
-      item: *Item = cur_mod.items[j];
-      if item.ident.name.x == path.segments[i].name.x  {
-        if item.kind == ItemKind::Module {
-          cur_mod = item.node.module;
-        }
-        else if i != path.num_segments - 1  emit_error(ctx.source_map, path.span, "Invalid path in use");
+add_item :: (ctx: *ResolutionContext, parent: *Module, item: *Item) {
 
-        if i == path.num_segments - 1 || path.segments[i+1].name.x == 0 {
-          binding: Binding;
-          binding.kind = BindingKind::Item;
-          binding.node.item = item;
-          return binding;
-        }
-
-        found = true;
-        break;
-      }
-      j = j + 1;
-    }
-    if !found  emit_error(ctx.source_map, path.span, "Unable to resolve use");
-    i = i + 1;
-  }
-}
-
-absolute_use :: (ctx: *ResolutionContext, module: *Module, item: *Item) {
-  p: *Path = &item.node._use;
-  abs: Path;
-  if p.segments[0].name.x == intern(ctx.interner, "self").x {
-    abs.num_segments = module.path.num_segments + p.num_segments - 1;
-    abs.segments = malloc(sizeof(Ident) * abs.num_segments);
-    memcpy(abs.segments, module.path.segments, sizeof(Ident) * module.path.num_segments);
-    memcpy(&abs.segments[module.path.num_segments], &p.segments[1], sizeof(Ident) * (p.num_segments - 1));
-    *p = abs;
-  }
-  else if p.segments[0].name.x == intern(ctx.interner, "super").x {
-    parent: *Module = module.parent;
-    abs.num_segments = parent.path.num_segments + p.num_segments - 1;
-    abs.segments = malloc(sizeof(Ident) * abs.num_segments);
-    memcpy(abs.segments, parent.path.segments, sizeof(Ident) * parent.path.num_segments);
-    memcpy(&abs.segments[parent.path.num_segments], &p.segments[1], sizeof(Ident) * (p.num_segments - 1));
-    *p = abs;
-  }
-}
-
-index_use :: (ctx: *ResolutionContext, module: *Module) {
-  i: u32 = 0;
-  while i < module.num_items {
-    item: *Item = module.items[i];
-    if item.kind == ItemKind::Use {
-      absolute_use(ctx, module, item);
-      path: *Path = &item.node._use;
-      path.binding = index_use_binding(ctx, *path);
-    }
-
-    if item.kind == ItemKind::Module {
-        index_use(ctx, item.node.module);
-    }
-
-    i = i + 1;
-  }
-}
-
-add_item :: (ctx: *ResolutionContext, module: *Module, parent: *Module, item: *Item) {
-
-  idx_entry: *IndexEntry = &module.index[module.num_indices];
+  idx_entry: *IndexEntry = &ctx.index[ctx.num_indices];
 
 
   idx_entry.path.num_segments = parent.path.num_segments + 1;
@@ -259,77 +160,32 @@ add_item :: (ctx: *ResolutionContext, module: *Module, parent: *Module, item: *I
   idx_entry.path.binding.kind = BindingKind::Item;
   idx_entry.path.binding.node.item = item;
 
-  intmap_insert(module.index_lookup, item.ident.name.x, module.num_indices);
+  intmap_insert(ctx.index_lookup, item.ident.name.x, ctx.num_indices);
 
-  module.num_indices = module.num_indices + 1;
+  ctx.num_indices = ctx.num_indices + 1;
 }
 
 
-add_absolute_item :: (ctx: *ResolutionContext, module: *Module, path: Path, item: *Item) {
+import_wildcard :: (ctx: *ResolutionContext, path: Path) {
 
-  idx_entry: *IndexEntry = &module.index[module.num_indices];
+  module: *Module = path.binding.node.module;
 
-
-  idx_entry.path = path;
-
-  intmap_insert(module.index_lookup, item.ident.name.x, module.num_indices);
-
-  module.num_indices = module.num_indices + 1;
+  i: u32 = 0;
+  while i < module.num_items {
+    item: *Item = &module.items[i];
+    if item.kind != ItemKind::Use  add_item(ctx, module, item);
+    i = i + 1;
+  }
 }
 
 index_module :: (ctx: *ResolutionContext, module: *Module) {
+
   i: u32 = 0;
   while i < module.num_items {
-    item: *Item = module.items[i];
+    item: *Item = &module.items[i];
 
-    if item.kind == ItemKind::Use {
-      path: Path = item.node._use;
-
-      if path.segments[path.num_segments-1].name.x != 0 {
-        add_absolute_item(ctx, module, path, path.binding.node.item);
-      }
-    } else {
-      add_item(ctx, module, module, item);
-    }
-    i = i + 1;
-  }
-
-  i = 0;
-  while i < module.num_items {
-    item: *Item = module.items[i];
-    if item.kind == ItemKind::Module  index_module(ctx, item.node.module);
-    i = i + 1;
-  }
-}
-
-index_module_wildcards :: (ctx: *ResolutionContext, module: *Module) {
-  i: u32 = 0;
-  while i < module.num_items {
-    item: *Item = module.items[i];
-
-    if item.kind == ItemKind::Use {
-      path: Path = item.node._use;
-      if path.segments[path.num_segments-1].name.x == 0 {
-         bound: *Item = path.binding.node.item;
-         if bound.kind == ItemKind::Module {
-           m: *Module = bound.node.module;
-           j: u32 = 0;
-           while j < m.num_items {
-             it: *Item = m.items[j];
-             add_item(ctx, module, m, it);
-             j = j + 1;
-           }
-         }
-         else  abort();
-      }
-    }
-    i = i + 1;
-  }
-
-  i = 0;
-  while i < module.num_items {
-    item: *Item = module.items[i];
-    if item.kind == ItemKind::Module  index_module_wildcards(ctx, item.node.module);
+    if item.kind == ItemKind::Use  import_wildcard(ctx, item.node._use);
+    else  add_item(ctx, module, item);
     i = i + 1;
   }
 }
@@ -557,39 +413,34 @@ resolve_compound :: (ctx: *ResolutionContext, item: *Item) {
   }
 }
 
-resolve_module :: (ctx: *ResolutionContext, module: *Module);
-
 resolve_item :: (ctx: *ResolutionContext, item: *Item) {
   if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  resolve_variable(ctx, item);
   if item.kind == ItemKind::Function  resolve_function(ctx, item);
   if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  resolve_compound(ctx, item);
-  if item.kind == ItemKind::Module  resolve_module(ctx, item.node.module);
 }
 
 resolve_module :: (ctx: *ResolutionContext, module: *Module) {
-  push_module(ctx, module);
 
   i: u32 = 0;
   while i < module.num_items {
-    resolve_item(ctx, module.items[i]);
+    resolve_item(ctx, &module.items[i]);
     i = i + 1;
   }
-  pop_module(ctx);
 }
 
-resolve :: (sess: *Session, ast: *Ast) {
+resolve_names :: (sess: *Session, module: *Module) {
   ctx: ResolutionContext;
 
   ctx.interner = &sess.interner;
   setup_primitive_ty_sids(ctx.interner, &ctx.primitive_ty_sids);
-  ctx.ast = ast;
   ctx.scope_stack = malloc(sizeof(Scope) * 128);
   ctx.stack_top = 0;
   ctx.source_map = &sess.source;
-  ctx.root_module = ast.root_module;
+  ctx.index_lookup = intmap_create(2048);
+  ctx.index = malloc(sizeof(IndexEntry) * 2048);
+  ctx.num_indices = 1;
 
-  index_use(&ctx, ast.root_module);
-  index_module(&ctx, ast.root_module);
-  index_module_wildcards(&ctx, ast.root_module);
-  resolve_module(&ctx, ast.root_module);
+
+  index_module(&ctx, module);
+  resolve_module(&ctx, module);
 }

@@ -15,17 +15,62 @@ mod typecheck;
 mod codegen;
 
 use self::cstd::*;
-use self::session::Session;
-use self::interning::interner_create;
-use self::source_map::source_map_create;
-use self::ast::Ast;
-use self::parser::parse;
-use self::resolution::resolve;
-use self::typecheck::check;
-use self::codegen::generate;
+use self::intmap::*;
+use self::strmap::*;
+use self::source_map::*;
+use self::error::*;
+use self::interning::*;
+use self::session::*;
+use self::tokens::*;
+use self::lexer::*;
+use self::ast::*;
+use self::parser::*;
+use self::resolution::*;
+use self::typecheck::*;
+use self::codegen::*;
 
 extern basename :: (path: *char) -> *char
 extern dirname :: (path: *char) -> *char
+
+add_module :: (sess: *Session, target: *CompileTarget, path: Path, parent: *Module) -> *Module;
+
+find_module :: (sess: *Session, target: *CompileTarget, path: Path, parent: *Module) -> *Module {
+
+  i: i32 = 0;
+  while i < target.num_modules {
+    module: *Module = target.modules[i];
+    if module.path.segments[0].name.x == path.segments[0].name.x  return module;
+    i = i + 1;
+  }
+
+  return add_module(sess, target, path, parent);
+}
+
+add_module :: (sess: *Session, target: *CompileTarget, path: Path, parent: *Module) -> *Module {
+
+  source: *SourceFile = source_map_new_file(&sess.source, sess.root_path, get_str(&sess.interner, path.segments[0].name));
+  module: *Module = parse(sess, source, path.segments[0].name, parent);
+
+  target.modules[target.num_modules] = module;
+  target.num_modules = target.num_modules + 1;
+
+  i: i32 = 0;
+  while i < module.num_items {
+    item: *Item = &module.items[i];
+    if item.kind == ItemKind::Use {
+      binding: Binding;
+      binding.kind = BindingKind::Module;
+      binding.node.module = find_module(sess, target, item.node._use, parent);
+      item.node._use.binding = binding;
+    }
+    i = i + 1;
+  }
+
+  resolve_names(sess, module);
+  check(sess, module);
+
+  return module;
+}
 
 main :: (argc: i32, argv: **char) -> i32 {
   if argc != 3 {
@@ -42,11 +87,19 @@ main :: (argc: i32, argv: **char) -> i32 {
   sess.root_path = dirname(argv[1]);
 
   strtok(root_filename, ".z");
-  ast: Ast = parse(&sess, root_filename);
 
-  resolve(&sess, &ast);
-  check(&sess, &ast);
-  generate(&sess, ast, argv[2]);
+  target: CompileTarget;
+  target.modules = malloc(8 * 64);
+  target.num_modules = 0;
+
+  root_path: Path;
+  root_path.segments = malloc(sizeof(Ident));
+  root_path.segments[0].name = intern(&sess.interner, root_filename);
+  root_path.num_segments = 1;
+
+  add_module(&sess, &target, root_path, null);
+
+  generate(&sess, &target, argv[2]);
 
   return 0;
 }

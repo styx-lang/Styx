@@ -4,11 +4,11 @@ use super::interning::*;
 use super::source_map::*;
 use super::error::*;
 use super::ast::*;
+use super::session::*;
 
 CodegenContext :: struct {
   out: *FILE,
   sess: *Session,
-  ast: *Ast,
   source: *SourceMap,
   current_module: *Module,
   interner: *Interner,
@@ -324,8 +324,7 @@ generate_variable :: (ctx: *CodegenContext, item: *Item) {
   fprintf(ctx.out, ";\n");
 }
 
-generate_function :: (ctx: *CodegenContext, item: *Item) {
-
+generate_function_decl :: (ctx: *CodegenContext, item: *Item) {
   emit_line_directive(ctx.out, ctx.source, item.span);
 
   func: FunctionData = item.node.function;
@@ -356,7 +355,11 @@ generate_function :: (ctx: *CodegenContext, item: *Item) {
     i = i + 1;
   }
   fprintf(ctx.out, ") ");
-  if func.body  generate_expr(ctx, func.body);
+}
+
+generate_function :: (ctx: *CodegenContext, item: *Item) {
+  generate_function_decl(ctx, item);
+  if item.node.function.body  generate_expr(ctx, item.node.function.body);
   else  fprintf(ctx.out, ";\n");
 }
 
@@ -393,11 +396,6 @@ generate_compound :: (ctx: *CodegenContext, item: *Item) {
 
   module: *Module = ctx.current_module;
 
-  fprintf(ctx.out, "typedef %s", compound_kind);
-  mangle_path_and_ident(ctx, module.path, item.ident);
-  mangle_path_and_ident(ctx, module.path, item.ident);
-  fprintf(ctx.out, ";\n");
-
   compound_ty: *Ty = data.ty;
   def: *CompoundDef = &compound_ty.node.compound;
 
@@ -420,37 +418,96 @@ generate_compound :: (ctx: *CodegenContext, item: *Item) {
   }
 }
 
-generate_mod :: (ctx: *CodegenContext, module: *Module) {
-  old_module: *Module = ctx.current_module;
+generate_compound_decl :: (ctx: *CodegenContext, item: *Item) {
+
+  compound_kind: *char;
+  if item.kind == ItemKind::Struct  compound_kind = "struct";
+  else  compound_kind = "union";
+  module: *Module = ctx.current_module;
+
+  emit_line_directive(ctx.out, ctx.source, item.span);
+  fprintf(ctx.out, "typedef %s", compound_kind);
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  fprintf(ctx.out, ";\n\n");
+}
+
+generate_mod_type_decl :: (ctx: *CodegenContext, module: *Module) {
   ctx.current_module = module;
   i: u32 = 0;
   while i < module.num_items {
-    generate_item(ctx, module.items[i]);
+    item: *Item = &module.items[i];
+    if item.kind == ItemKind::Enum   generate_enum(ctx, item);
+    else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  generate_compound_decl(ctx, item);
     i = i + 1;
   }
-  ctx.current_module = old_module;
 }
 
-generate_item :: (ctx: *CodegenContext, item: *Item) {
-
-  if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  generate_variable(ctx, item);
-  else if item.kind == ItemKind::Enum   generate_enum(ctx, item);
-  else if item.kind == ItemKind::Function   generate_function(ctx, item);
-  else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  generate_compound(ctx, item);
-  else if item.kind == ItemKind::Module  generate_mod(ctx, item.node.module);
-  fprintf(ctx.out, "\n");
+generate_mod_type_defs :: (ctx: *CodegenContext, module: *Module) {
+  ctx.current_module = module;
+  i: u32 = 0;
+  while i < module.num_items {
+    item: *Item = &module.items[i];
+    if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  generate_variable(ctx, item);
+    else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  generate_compound(ctx, item);
+    i = i + 1;
+  }
 }
 
-generate :: (sess: *Session, ast: Ast, output_file: *char) {
+generate_mod_fn_decl :: (ctx: *CodegenContext, module: *Module) {
+  ctx.current_module = module;
+  i: u32 = 0;
+  while i < module.num_items {
+    item: *Item = &module.items[i];
+    if item.kind == ItemKind::Function  {
+      generate_function_decl(ctx, item);
+      fprintf(ctx.out, ";\n");
+    }
+    i = i + 1;
+  }
+}
+
+generate_mod_fn_bodies :: (ctx: *CodegenContext, module: *Module) {
+  ctx.current_module = module;
+  i: u32 = 0;
+  while i < module.num_items {
+    item: *Item = &module.items[i];
+    if item.kind == ItemKind::Function   generate_function(ctx, item);
+    i = i + 1;
+  }
+}
+
+generate :: (sess: *Session, target: *CompileTarget, output_file: *char) {
   ctx: CodegenContext;
 
   ctx.out = fopen(output_file, "w");
   ctx.sess = sess;
   ctx.interner = &sess.interner;
   ctx.source = &sess.source;
-  ctx.ast = &ast;
 
   generate_prelude(&ctx);
 
-  generate_mod(&ctx, ast.root_module);
+  i: i32 = 0;
+  while i < target.num_modules {
+    generate_mod_type_decl(&ctx, target.modules[i]);
+    i = i + 1;
+  }
+
+  i = 0;
+  while i < target.num_modules {
+    generate_mod_type_defs(&ctx, target.modules[i]);
+    i = i + 1;
+  }
+
+  i = 0;
+  while i < target.num_modules {
+    generate_mod_fn_decl(&ctx, target.modules[i]);
+    i = i + 1;
+  }
+
+  i = 0;
+  while i < target.num_modules {
+    generate_mod_fn_bodies(&ctx, target.modules[i]);
+    i = i + 1;
+  }
 }

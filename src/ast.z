@@ -8,6 +8,7 @@ AstType :: struct {}
 Expr :: struct {}
 Block :: struct {}
 Item :: struct {}
+Module :: struct {}
 
 Ident :: struct {
   name: Sid,
@@ -66,8 +67,8 @@ PrimitiveTy :: struct {
 
 BindingKind :: enum {
   Item,
-  Variable,
   Local,
+  Module,
   Parameter,
   PrimitiveType,
   Variant,
@@ -85,6 +86,7 @@ BindingNode :: union {
   parameter: *FunctionParameter,
   primitive: PrimitiveTy,
   variant: *EnumVariant,
+  module: *Module,
 }
 
 Binding :: struct {
@@ -162,17 +164,10 @@ Pattern :: struct {
 
 Item :: struct {}
 
-IndexEntry :: struct {
-  path: Path,
-}
-
 Module :: struct {
   span: Span,
-  items: **Item,
+  items: *Item,
   num_items: u32,
-  index_lookup: *IntMap,
-  index: *IndexEntry,
-  num_indices: u32,
   path: Path,
   parent: *Module,
 }
@@ -441,7 +436,6 @@ ItemKindNode :: union {
   _enum: EnumData,
   variable: VariableData,
   function: FunctionData,
-  module: *Module,
   _use: Path,
 }
 
@@ -449,7 +443,6 @@ ItemKind :: enum {
   Const,
   Enum,
   Function,
-  Module,
   Struct,
   Union,
   Use,
@@ -465,24 +458,14 @@ Item :: struct {
   should_mangle: bool,
 }
 
-Ast :: struct {
-  items: *Item,
-  num_items: u32,
-
-  root_module: *Module,
-}
-
-ast_create_expr :: (ast: *Ast, kind: ExprKind) -> *Expr {
+create_expr :: (kind: ExprKind) -> *Expr {
   expr: *Expr = malloc(sizeof(Expr));
   expr.kind = kind;
-
   return expr;
 }
 
-ast_create_item :: (ast: *Ast) -> *Item {
 
-  item: *Item = &ast.items[ast.num_items];
-  ast.num_items = ast.num_items + 1;
-
-  return item;
+CompileTarget :: struct {
+  modules: **Module,
+  num_modules: u32,
 }

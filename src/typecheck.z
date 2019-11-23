@@ -1,9 +1,11 @@
 
+use super::cstd::*;
 use super::intmap::*;
 use super::interning::*;
 use super::source_map::*;
 use super::ast::*;
 use super::error::*;
+use super::session::*;
 
 CommonTypes :: struct {
   _void: *Ty,
@@ -25,7 +27,7 @@ CommonTypes :: struct {
 }
 
 TypeContext :: struct {
-  ast: *Ast,
+  initialized: bool,
   interner: *Interner,
   source_map: *SourceMap,
   common: CommonTypes,
@@ -53,7 +55,7 @@ hash_path :: (path: Path) -> u64 {
   h: u64 = path.num_segments;
   i: u32 = 0;
   while i < path.num_segments {
-    h = h ^ (path.segments[i].name.x + 2654435769 + (h << 6) + (h >> 2));
+    h = (h << 8) | path.segments[i].name.x;
     i = i + 1;
   }
   return h;
@@ -246,13 +248,13 @@ coerce_binary_expr :: (ctx: *TypeContext, expr: *Expr, left: *Ty, right: *Ty) {
 
   if coerce_left == 1 || coerce_right == 1 {}
   else if coerce_left == 2 {
-    cast_expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Cast);
+    cast_expr: *Expr = create_expr(ExprKind::Cast);
     cast_expr.node._cast.ty = right;
     cast_expr.node._cast.inner = expr.node.binary.left;
     expr.node.binary.left = cast_expr;
   }
   else if coerce_right == 2 {
-    cast_expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Cast);
+    cast_expr: *Expr = create_expr(ExprKind::Cast);
     cast_expr.node._cast.ty = left;
     cast_expr.node._cast.inner = expr.node.binary.right;
     expr.node.binary.right = cast_expr;
@@ -264,7 +266,7 @@ coerce_expr_type :: (ctx: *TypeContext, expr: *Expr, from: *Ty, to: *Ty) -> *Exp
   can_coerce: u32 = coerce_type(ctx, from, to);
   if can_coerce == 1  return expr;
   else if can_coerce == 2 {
-    cast_expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Cast);
+    cast_expr: *Expr = create_expr(ExprKind::Cast);
     cast_expr.node._cast.ty = to;
     cast_expr.node._cast.inner = expr;
     return cast_expr;
@@ -527,7 +529,6 @@ check_item :: (ctx: *TypeContext, item: *Item) {
   if item.kind == ItemKind::Enum  {}
   else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  {}
   else if item.kind == ItemKind::Use  {}
-  else if item.kind == ItemKind::Module  check_mod(ctx, item.node.module);
   else if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  check_variable(ctx, item);
   else if item.kind == ItemKind::Function  check_function(ctx, item);
   else abort();
@@ -536,12 +537,12 @@ check_item :: (ctx: *TypeContext, item: *Item) {
 check_mod :: (ctx: *TypeContext, module: *Module) {
   i: u32 = 0;
   while i < module.num_items {
-    check_item(ctx, module.items[i]);
+    check_item(ctx, &module.items[i]);
     i = i + 1;
   }
 }
 
-collect_enum :: (ctx: *TypeContext, item: *Item, path: Path) {
+collect_enum :: (ctx: *TypeContext, item: *Item) {
 
   ty: *Ty = item.node._enum.ty;
   def: *EnumDef = &ty.node._enum;
@@ -585,7 +586,7 @@ collect_function :: (ctx: *TypeContext, item: *Item) {
   item.node.function.header.ty = intern_ty(ctx, ty);
 }
 
-collect_compound :: (ctx: *TypeContext, item: *Item, path: Path) {
+collect_compound :: (ctx: *TypeContext, item: *Item) {
   ty: *Ty = item.node.compound.ty;
   def: *CompoundDef = &ty.node.compound;
 
@@ -603,22 +604,17 @@ collect_compound :: (ctx: *TypeContext, item: *Item, path: Path) {
 
 }
 
-collect_mod :: (ctx: *TypeContext, module: *Module);
-
-collect_item :: (ctx: *TypeContext, item: *Item, path: Path) {
-  if item.kind == ItemKind::Enum  collect_enum(ctx, item, path);
+collect_item :: (ctx: *TypeContext, item: *Item) {
+  if item.kind == ItemKind::Enum  collect_enum(ctx, item);
   else if item.kind == ItemKind::Function  collect_function(ctx, item);
   else if item.kind == ItemKind::Variable || item.kind == ItemKind::Const  collect_variable(ctx, item);
-  else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  collect_compound(ctx, item, path);
-  else if item.kind == ItemKind::Module  collect_mod(ctx, item.node.module);
+  else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  collect_compound(ctx, item);
 }
 
 collect_mod :: (ctx: *TypeContext, module: *Module) {
   i: u32 = 0;
   while i < module.num_items {
-    item: *Item = module.items[i];
-    idx: u32 = intmap_lookup(module.index_lookup, item.ident.name.x);
-    collect_item(ctx, item, module.index[idx].path);
+    collect_item(ctx, &module.items[i]);
     i = i + 1;
   }
 }
@@ -626,7 +622,7 @@ collect_mod :: (ctx: *TypeContext, module: *Module) {
 collect_names :: (ctx: *TypeContext, module: *Module) {
   i: u32 = 0;
   while i < module.num_items {
-    item: *Item = module.items[i];
+    item: *Item = &module.items[i];
     if item.kind == ItemKind::Struct || item.kind == ItemKind::Union {
       def: CompoundDef;
       def.path.num_segments = module.path.num_segments + 1;
@@ -661,23 +657,25 @@ collect_names :: (ctx: *TypeContext, module: *Module) {
 
       item.node._enum.ty = intern_ty(ctx, ty);
     }
-    else if item.kind == ItemKind::Module  collect_names(ctx, item.node.module);
     i = i + 1;
   }
 }
 
-check :: (sess: *Session, ast: *Ast) {
-  ctx: TypeContext;
+ctx: TypeContext;
 
-  ctx.ast = ast;
-  ctx.interner = &sess.interner;
-  ctx.source_map = &sess.source;
-  ctx.types_lookup = intmap_create(1024);
-  ctx.types = malloc(sizeof(Ty) * 1024);
-  ctx.next_type_idx = 1;
-  create_common_types(&ctx);
+check :: (sess: *Session, module: *Module) {
 
-  collect_names(&ctx, ast.root_module);
-  collect_mod(&ctx, ast.root_module);
-  check_mod(&ctx, ast.root_module);
+  if !ctx.initialized {
+    ctx.interner = &sess.interner;
+    ctx.source_map = &sess.source;
+    ctx.types_lookup = intmap_create(1024);
+    ctx.types = malloc(sizeof(Ty) * 1024);
+    ctx.next_type_idx = 1;
+    create_common_types(&ctx);
+    ctx.initialized = true;
+  }
+
+  collect_names(&ctx, module);
+  collect_mod(&ctx, module);
+  check_mod(&ctx, module);
 }
