@@ -33,16 +33,16 @@ main :: (argc: i32, argv: **char) -> i32 {
     abort();
   }
 
-  var sess: Session;
+  sess: Session;
 
 
   sess.interner = interner_create();
   sess.source = source_map_create();
-  var root_filename: *char = basename(argv[1]);
+  root_filename: *char = basename(argv[1]);
   sess.root_path = dirname(argv[1]);
 
   strtok(root_filename, ".z");
-  val ast: Ast = parse(&sess, root_filename);
+  ast: Ast = parse(&sess, root_filename);
 
   resolve(&sess, &ast);
   check(&sess, &ast);

@@ -9,14 +9,14 @@ IntMap :: struct {
 }
 
 intmap_create :: (size: u64) -> *IntMap {
-  var map: *IntMap = malloc(sizeof(IntMap));
+  map: *IntMap = malloc(sizeof(IntMap));
 
   map.size = size;
   map.load = 0;
   map.keys = malloc(size*8);
   map.values = malloc(size*8);
 
-  var i: u32 = 0;
+  i: u32 = 0;
   while i < size {
     map.keys[i] = 0;
     map.values[i] = 0;
@@ -38,7 +38,7 @@ intmap_reset :: (map: *IntMap) {
 }
 
 intmap_insert :: (map: *IntMap, key: u64, value: u64) {
-  val h: u64 = intmap_hash(key) % map.size;
+  h: u64 = intmap_hash(key) % map.size;
   if map.load + 1 >= map.size {
     printf("Hashmap of size %lu is full!\n", map.size);
     exit(-1);
@@ -59,7 +59,7 @@ intmap_insert :: (map: *IntMap, key: u64, value: u64) {
 }
 
 intmap_lookup :: (map: *IntMap, key: u64) -> u64 {
-  var h: u64 = intmap_hash(key) % map.size;
+  h: u64 = intmap_hash(key) % map.size;
   while (true) {
     if map.keys[h] == 0  return 0;
     if map.keys[h] == key {

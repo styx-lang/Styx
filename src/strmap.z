@@ -9,14 +9,14 @@ StrMap :: struct {
 }
 
 strmap_create :: (size: u64) -> *StrMap {
-  var map: *StrMap = malloc(sizeof(StrMap));
+  map: *StrMap = malloc(sizeof(StrMap));
 
   map.size = size;
   map.load = 0;
   map.keys = malloc(size*8);
   map.values = malloc(size*4);
 
-  var i: u32 = 0;
+  i: u32 = 0;
   while i < size {
     map.keys[i] = 0;
     map.values[i] = 0;
@@ -27,9 +27,9 @@ strmap_create :: (size: u64) -> *StrMap {
 }
 
 strmap_hash :: (s: *char) -> u32 {
-  var hash: u32 = 5381;
-  var c: i32 = *s;
-  var i: u32 = 0;
+  hash: u32 = 5381;
+  c: i32 = *s;
+  i: u32 = 0;
   while c != 0 {
     hash = (hash << 5) + hash + c;
     i = i + 1;
@@ -40,7 +40,7 @@ strmap_hash :: (s: *char) -> u32 {
 }
 
 strmap_insert :: (map: *StrMap, key: *char, value: u32) {
-  val h: u32 = strmap_hash(key) % map.size;
+  h: u32 = strmap_hash(key) % map.size;
   if map.load + 1 >= map.size {
     printf("Hashmap of size %lu is full!\n", map.size);
     exit(-1);
@@ -61,7 +61,7 @@ strmap_insert :: (map: *StrMap, key: *char, value: u32) {
 }
 
 strmap_lookup :: (map: *StrMap, key: *char) -> u32 {
-  var h: u32 = strmap_hash(key) % map.size;
+  h: u32 = strmap_hash(key) % map.size;
   while (true) {
     if map.keys[h] == 0  return 0;
     if !strcmp(map.keys[h],key) {

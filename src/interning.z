@@ -12,7 +12,7 @@ Interner :: struct {
 }
 
 interner_create :: () -> Interner {
-  var interner: Interner;
+  interner: Interner;
   interner.str_lookup = strmap_create(2048);
   interner.sid_lookup = calloc(8, 2048);
   interner.next_sid = 1;
@@ -21,15 +21,15 @@ interner_create :: () -> Interner {
 
 
 intern :: (self: *Interner, string: *char) -> Sid  {
-  var sid: Sid;
+  sid: Sid;
   sid.x = strmap_lookup(self.str_lookup, string);
   if sid.x == 0 {
 
     sid.x = self.next_sid;
     self.next_sid = self.next_sid + 1;
 
-    var len: u64 = strlen(string) + 1;
-    var copy: *char = malloc(len);
+    len: u64 = strlen(string) + 1;
+    copy: *char = malloc(len);
     memcpy(copy, string, len);
     self.sid_lookup[sid.x] = copy;
 

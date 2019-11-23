@@ -22,7 +22,7 @@ SourceMap :: struct {
 }
 
 source_map_create :: () -> SourceMap {
-  var map: SourceMap;
+  map: SourceMap;
   map.files = calloc(sizeof(SourceFile), 64);
   map.num_files = 0;
   map.file_starts = calloc(sizeof(u32), 64);
@@ -31,7 +31,7 @@ source_map_create :: () -> SourceMap {
 }
 
 load_file_content :: (file: *SourceFile) {
-  var fp: *FILE = fopen(file.name, "rb");
+  fp: *FILE = fopen(file.name, "rb");
   fseek(fp, 0, SEEK_END);
   file.length = ftell(fp);
   rewind(fp);
@@ -41,12 +41,12 @@ load_file_content :: (file: *SourceFile) {
 }
 
 source_map_new_file :: (self: *SourceMap, path: *char, filename: *char) -> *SourceFile {
-  var file: *SourceFile = &self.files[self.num_files];
+  file: *SourceFile = &self.files[self.num_files];
   self.num_files = self.num_files + 1;
 
-  var needed_length: u32 = strlen(path) + strlen(filename) + 4;
+  needed_length: u32 = strlen(path) + strlen(filename) + 4;
 
-  var name_buffer: *char = malloc(needed_length);
+  name_buffer: *char = malloc(needed_length);
 
   sprintf(name_buffer, "%s/%s.z", path, filename);
 
@@ -74,8 +74,8 @@ source_file_done :: (self: *SourceFile, length: u32) {
 }
 
 source_map_info :: (m: *SourceMap, span: Span, first: *u32, last: *u32) -> *SourceFile {
-  var i: u32 = 0;
-  var file: *SourceFile = 0;
+  i: u32 = 0;
+  file: *SourceFile = 0;
   while i < m.num_files {
     if m.file_starts[i] > span.from  break;
     file = &m.files[i];
@@ -105,29 +105,29 @@ source_map_info :: (m: *SourceMap, span: Span, first: *u32, last: *u32) -> *Sour
 }
 
 emit_line_directive :: (fp: *FILE, m: *SourceMap, span: Span) {
-  var line_first: u32;
-  var line_end: u32;
+  line_first: u32;
+  line_end: u32;
 
-  var file: *SourceFile = source_map_info(m, span, &line_first, &line_end);
+  file: *SourceFile = source_map_info(m, span, &line_first, &line_end);
 
   fprintf(fp, "#line %u \"%s\"\n", line_first + 1, file.name);
 }
 
 source_snippet :: (m: *SourceMap, span: Span) {
 
-  var line_first: u32;
-  var line_last: u32;
+  line_first: u32;
+  line_last: u32;
 
-  var file: *SourceFile = source_map_info(m, span, &line_first, &line_last);
+  file: *SourceFile = source_map_info(m, span, &line_first, &line_last);
 
   printf("%s:%u\n", file.name, line_first + 1);
 
-  var buffer: *char = malloc(1024);
-  var i: u32 = line_first;
+  buffer: *char = malloc(1024);
+  i: u32 = line_first;
   while i <= line_last {
-    val line_start: u32 = file.lines[i];
-    val line_end: u32 = file.lines[i + 1];
-    var length: u32 = line_end - line_start;
+    line_start: u32 = file.lines[i];
+    line_end: u32 = file.lines[i + 1];
+    length: u32 = line_end - line_start;
     memcpy(buffer, &file.content[line_start + 1 - file.start], length);
     buffer[length+1] = 0;
     printf("%s\n", buffer);

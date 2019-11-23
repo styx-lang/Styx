@@ -54,12 +54,12 @@ generate_pattern :: (ctx: *CodegenContext, pat: Pattern) {
 }
 
 mangle_path :: (ctx: *CodegenContext, path: Path) {
-  val item: *Item = path.binding.node.item;
+  item: *Item = path.binding.node.item;
   if (path.binding.kind == BindingKind::Item && item.should_mangle) {
     fprintf(ctx.out, "_ZN");
-    var i: u32 = 0;
+    i: u32 = 0;
     while i < path.num_segments {
-      var seg: *char = get_str(ctx.interner, path.segments[i].name);
+      seg: *char = get_str(ctx.interner, path.segments[i].name);
       fprintf(ctx.out, "%lu%s", strlen(seg), seg);
       i = i + 1;
     }
@@ -74,13 +74,13 @@ mangle_path :: (ctx: *CodegenContext, path: Path) {
 
 mangle_path_and_ident :: (ctx: *CodegenContext, path: Path, ident: Ident) {
   fprintf(ctx.out, " _ZN");
-  var i: u32 = 0;
+  i: u32 = 0;
   while i < path.num_segments {
-    var seg: *char = get_str(ctx.interner, path.segments[i].name);
+    seg: *char = get_str(ctx.interner, path.segments[i].name);
     fprintf(ctx.out, "%lu%s", strlen(seg), seg);
     i = i + 1;
   }
-  var name: *char = get_str(ctx.interner, ident.name);
+  name: *char = get_str(ctx.interner, ident.name);
   fprintf(ctx.out, "%lu%sE", strlen(name), name);
 }
 
@@ -178,9 +178,9 @@ generate_call :: (ctx: *CodegenContext, call: CallData) {
   generate_expr(ctx, call.func);
 
   fprintf(ctx.out, "(");
-  var i: u32 = 0;
+  i: u32 = 0;
   while i < call.num_args {
-    val arg: *Expr = call.args[i];
+    arg: *Expr = call.args[i];
     generate_expr(ctx, arg);
     if i < call.num_args - 1  fprintf(ctx.out, ",");
     i = i + 1;
@@ -214,14 +214,14 @@ generate_indexing :: (ctx: *CodegenContext, idx: IndexingData) {
 }
 
 generate_field :: (ctx: *CodegenContext, field: FieldData) {
-  var strct: *Expr = field.strct;
+  strct: *Expr = field.strct;
   generate_expr(ctx, strct);
 
-  var field_name: *char = get_str(ctx.interner, field.ident.name)
+  field_name: *char = get_str(ctx.interner, field.ident.name)
 
-  var strct_ty: *Ty = strct.ty;
-  var is_ptr: bool = strct_ty.kind == TyKind::Ptr;
-  var accessor_str: *char;
+  strct_ty: *Ty = strct.ty;
+  is_ptr: bool = strct_ty.kind == TyKind::Ptr;
+  accessor_str: *char;
 
   if is_ptr  accessor_str = "->";
   else  accessor_str = ".";
@@ -252,25 +252,11 @@ generate_control_flow :: (ctx: *CodegenContext, is_continue: bool) {
   else  fprintf(ctx.out, "break;\n");
 }
 
-generate_let :: (ctx: *CodegenContext, data: LetData) {
-
-  generate_ty(ctx, data.ty);
-
-  var var_name: *char = get_str(ctx.interner, data.pat.ident.name);
-
-  fprintf(ctx.out, " %s ", var_name);
-  if data.value {
-    fprintf(ctx.out, "= ");
-    generate_expr(ctx, data.value);
-  }
-  fprintf(ctx.out, ";\n");
-}
-
 generate_local :: (ctx: *CodegenContext, data: LocalData) {
 
   generate_ty(ctx, data.ty);
 
-  var var_name: *char = get_str(ctx.interner, data.pat.ident.name);
+  var_name: *char = get_str(ctx.interner, data.pat.ident.name);
 
   fprintf(ctx.out, " %s ", var_name);
   if data.value {
@@ -302,7 +288,6 @@ generate_expr :: (ctx: *CodegenContext, expr: *Expr) {
    else if expr.kind == ExprKind::Sizeof  generate_sizeof(ctx, expr.node._sizeof);
    else if expr.kind == ExprKind::Assignment generate_assignment(ctx, expr.node.assignment);
    else if expr.kind == ExprKind::ControlFlow  generate_control_flow(ctx, expr.node.control_flow_is_continue);
-   else if expr.kind == ExprKind::Let  generate_let(ctx, expr.node._let);
    else if expr.kind == ExprKind::Local  generate_local(ctx, expr.node.local);
    else if expr.kind == ExprKind::Return  generate_return(ctx, expr.node._return);
    else if expr.kind == ExprKind::Cast  generate_cast(ctx, expr.node._cast);
@@ -311,10 +296,10 @@ generate_expr :: (ctx: *CodegenContext, expr: *Expr) {
 
 generate_block :: (ctx: *CodegenContext, block: *Block) {
   fprintf(ctx.out, "{\n");
-  var i: u32 = 0;
+  i: u32 = 0;
 
   while i < block.num_exprs {
-    var expr: *Expr = block.exprs[i];
+    expr: *Expr = block.exprs[i];
     emit_line_directive(ctx.out, ctx.source, expr.span);
     generate_expr(ctx, expr);
     fprintf(ctx.out, ";\n");
@@ -329,7 +314,7 @@ generate_variable :: (ctx: *CodegenContext, item: *Item) {
 
   generate_ty(ctx, item.node.variable.ty);
 
-  val module: *Module = ctx.current_module;
+  module: *Module = ctx.current_module;
 
   mangle_path_and_ident(ctx, module.path, item.ident);
   if item.node.variable.body {
@@ -343,11 +328,11 @@ generate_function :: (ctx: *CodegenContext, item: *Item) {
 
   emit_line_directive(ctx.out, ctx.source, item.span);
 
-  val func: FunctionData = item.node.function;
-  val header: FunctionHeader = func.header;
+  func: FunctionData = item.node.function;
+  header: FunctionHeader = func.header;
 
-  val fn_ty: *Ty = header.ty;
-  val fn_def: FnDef = fn_ty.node.function;
+  fn_ty: *Ty = header.ty;
+  fn_def: FnDef = fn_ty.node.function;
 
   generate_ty(ctx, fn_def.output);
 
@@ -355,9 +340,9 @@ generate_function :: (ctx: *CodegenContext, item: *Item) {
   else  fprintf(ctx.out, " %s", get_str(ctx.interner, item.ident.name));
   fprintf(ctx.out, "(");
 
-  var i: u32 = 0;
+  i: u32 = 0;
   while i < header.num_parameters {
-    var ty: *Ty = fn_def.parameters[i];
+    ty: *Ty = fn_def.parameters[i];
     if ty.kind == TyKind::Variadic {
       fprintf(ctx.out, "...");
       break;
@@ -365,7 +350,7 @@ generate_function :: (ctx: *CodegenContext, item: *Item) {
 
     generate_ty(ctx, ty);
 
-    var param_name: *char = get_str(ctx.interner, header.parameters[i].pat.ident.name);
+    param_name: *char = get_str(ctx.interner, header.parameters[i].pat.ident.name);
     fprintf(ctx.out, " %s", param_name);
     if i < header.num_parameters - 1  fprintf(ctx.out, ", ");
     i = i + 1;
@@ -377,19 +362,19 @@ generate_function :: (ctx: *CodegenContext, item: *Item) {
 
 generate_enum :: (ctx: *CodegenContext, item: *Item) {
 
-  var enum_name: *char = get_str(ctx.interner, item.ident.name);
-  val module: *Module = ctx.current_module;
+  enum_name: *char = get_str(ctx.interner, item.ident.name);
+  module: *Module = ctx.current_module;
 
   emit_line_directive(ctx.out, ctx.source, item.span);
   fprintf(ctx.out, "typedef enum");
   mangle_path_and_ident(ctx, module.path, item.ident);
   fprintf(ctx.out, " {\n");
-  var i: u32 = 0;
+  i: u32 = 0;
 
-  val data: EnumData = item.node._enum;
+  data: EnumData = item.node._enum;
 
   while i < data.num_variants {
-    var variant_name: *char = get_str(ctx.interner, data.variants[i].ident.name);
+    variant_name: *char = get_str(ctx.interner, data.variants[i].ident.name);
     fprintf(ctx.out, "%s_%s,\n", enum_name, variant_name);
     i = i + 1;
   }
@@ -400,32 +385,32 @@ generate_enum :: (ctx: *CodegenContext, item: *Item) {
 
 generate_compound :: (ctx: *CodegenContext, item: *Item) {
 
-  var compound_kind: *char;
+  compound_kind: *char;
   if item.kind == ItemKind::Struct  compound_kind = "struct";
   else  compound_kind = "union";
 
-  val data: CompoundData = item.node.compound;
+  data: CompoundData = item.node.compound;
 
-  val module: *Module = ctx.current_module;
+  module: *Module = ctx.current_module;
 
   fprintf(ctx.out, "typedef %s", compound_kind);
   mangle_path_and_ident(ctx, module.path, item.ident);
   mangle_path_and_ident(ctx, module.path, item.ident);
   fprintf(ctx.out, ";\n");
 
-  val compound_ty: *Ty = data.ty;
-  val def: *CompoundDef = &compound_ty.node.compound;
+  compound_ty: *Ty = data.ty;
+  def: *CompoundDef = &compound_ty.node.compound;
 
   emit_line_directive(ctx.out, ctx.source, item.span);
   if data.num_fields > 0 {
     fprintf(ctx.out, "typedef %s", compound_kind);
     mangle_path_and_ident(ctx, module.path, item.ident);
     fprintf(ctx.out, " {\n");
-    var i: u32 = 0;
+    i: u32 = 0;
     while i < data.num_fields {
       generate_ty(ctx, def.fields[i].ty);
 
-      var field_name: *char = get_str(ctx.interner, data.fields[i].ident.name);
+      field_name: *char = get_str(ctx.interner, data.fields[i].ident.name);
       fprintf(ctx.out, " %s;\n", field_name);
       i = i + 1;
     }
@@ -436,9 +421,9 @@ generate_compound :: (ctx: *CodegenContext, item: *Item) {
 }
 
 generate_mod :: (ctx: *CodegenContext, module: *Module) {
-  var old_module: *Module = ctx.current_module;
+  old_module: *Module = ctx.current_module;
   ctx.current_module = module;
-  var i: u32 = 0;
+  i: u32 = 0;
   while i < module.num_items {
     generate_item(ctx, module.items[i]);
     i = i + 1;
@@ -457,7 +442,7 @@ generate_item :: (ctx: *CodegenContext, item: *Item) {
 }
 
 generate :: (sess: *Session, ast: Ast, output_file: *char) {
-  var ctx: CodegenContext;
+  ctx: CodegenContext;
 
   ctx.out = fopen(output_file, "w");
   ctx.sess = sess;

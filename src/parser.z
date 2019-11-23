@@ -23,7 +23,7 @@ is_done_parsing :: (ctx: *ParsingContext) -> bool {
 }
 
 accept :: (ctx: *ParsingContext, token: TokenKind) -> bool {
-  var tok : Token = ctx.tokens[ctx.current_token];
+  tok : Token = ctx.tokens[ctx.current_token];
   if !is_done_parsing(ctx) && tok.kind == token {
     ctx.current_token = ctx.current_token + 1;
     return true;
@@ -32,7 +32,7 @@ accept :: (ctx: *ParsingContext, token: TokenKind) -> bool {
 }
 
 can_accept :: (ctx: *ParsingContext, token: TokenKind) -> bool {
-  var tok : Token = ctx.tokens[ctx.current_token];
+  tok : Token = ctx.tokens[ctx.current_token];
   if !is_done_parsing(ctx) && tok.kind == token {
     return true;
   }
@@ -41,7 +41,7 @@ can_accept :: (ctx: *ParsingContext, token: TokenKind) -> bool {
 
 look_ahead :: (ctx: *ParsingContext, offset: u64) -> Token {
   if ctx.current_token == ctx.num_tokens {
-    var eof_tok: Token;
+    eof_tok: Token;
     eof_tok.kind = EOF;
     return eof_tok;
   } else  return ctx.tokens[ctx.current_token + offset];
@@ -53,7 +53,7 @@ consume :: (ctx: *ParsingContext) -> Token {
 }
 
 expect :: (ctx: *ParsingContext, kind: TokenKind) -> Token {
-  var tok: Token = consume(ctx);
+  tok: Token = consume(ctx);
   if tok.kind == kind {
     return tok;
   } else {
@@ -72,9 +72,9 @@ span_end :: (ctx: *ParsingContext) -> u32 {
 
 parse_identifier :: (ctx: *ParsingContext) -> Ident {
 
-  var ident: Ident;
+  ident: Ident;
   ident.span.from = span_start(ctx);
-  var tok: Token = consume(ctx);
+  tok: Token = consume(ctx);
 
   if tok.kind != TokenKind::Identifier  emit_error(ctx.source_map, tok.span, "Invalid identifier");
 
@@ -85,7 +85,7 @@ parse_identifier :: (ctx: *ParsingContext) -> Ident {
 }
 
 parse_path :: (ctx: *ParsingContext) -> Path {
-  var path: Path;
+  path: Path;
   path.segments = malloc(sizeof(Ident) * 6);
   path.num_segments = 0;
   path.span.from = span_start(ctx);
@@ -105,13 +105,13 @@ parse_path :: (ctx: *ParsingContext) -> Path {
 }
 
 parse_path_expr :: (ctx: *ParsingContext) -> *Expr {
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Path);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Path);
   expr.node.path = parse_path(ctx);
   return expr;
 }
 
 parse_pattern :: (ctx: *ParsingContext) -> Pattern {
-  var pat: Pattern;
+  pat: Pattern;
   pat.span.from = span_start(ctx);
   pat.ident = parse_identifier(ctx);
   pat.span.to = span_start(ctx);
@@ -119,10 +119,10 @@ parse_pattern :: (ctx: *ParsingContext) -> Pattern {
 }
 
 parse_type :: (ctx: *ParsingContext) -> *AstType {
-  var node: AstTypeKindNode;
-  var kind: AstTypeKind;
+  node: AstTypeKindNode;
+  kind: AstTypeKind;
 
-  val token: Token = look_ahead(ctx, 0);
+  token: Token = look_ahead(ctx, 0);
   if token.kind == TokenKind::Identifier {
     kind = AstTypeKind::Path;
     node.path = parse_path(ctx);
@@ -136,7 +136,7 @@ parse_type :: (ctx: *ParsingContext) -> *AstType {
   }
   else  emit_error(ctx.source_map, token.span, "Expected type");
 
-  var type: *AstType = malloc(sizeof(AstType));
+  type: *AstType = malloc(sizeof(AstType));
   type.kind = kind;
   type.node = node;
 
@@ -192,8 +192,8 @@ get_current_precedence :: (ctx: *ParsingContext) -> u32 {
   if ctx.num_tokens <= ctx.current_token {
     return 0;
   } else {
-    var tok : Token = ctx.tokens[ctx.current_token];
-    var op_precedence: u32 = get_binary_operator_precedence(convert_token_to_binary_operator(tok.kind));
+    tok : Token = ctx.tokens[ctx.current_token];
+    op_precedence: u32 = get_binary_operator_precedence(convert_token_to_binary_operator(tok.kind));
     if op_precedence > 0  return op_precedence;
     else if tok.kind == TokenKind::Dot  return 13;
     else if (tok.kind == TokenKind::LeftBracket || tok.kind == TokenKind::LeftParen)  return 12;
@@ -206,41 +206,41 @@ parse_expression :: (ctx: *ParsingContext, precedence: u32) -> *Expr
 
 parse_integer_literal :: (ctx: *ParsingContext) -> *Expr {
 
-  var tok: Token = expect(ctx, TokenKind::Integer);
+  tok: Token = expect(ctx, TokenKind::Integer);
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
   expr.node.lit.kind = LiteralKind::Int;
 
-  var sess: *Session = ctx.sess;
+  sess: *Session = ctx.sess;
   expr.node.lit.value.integer = atol(get_str(&sess.interner, tok.lexeme));
   return expr;
 }
 
 parse_float_literal :: (ctx: *ParsingContext) -> *Expr {
 
-  var tok: Token = expect(ctx, TokenKind::Float);
+  tok: Token = expect(ctx, TokenKind::Float);
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
   expr.node.lit.kind = LiteralKind::Float;
 
-  var sess: *Session = ctx.sess;
+  sess: *Session = ctx.sess;
   expr.node.lit.value.floating = atof(get_str(&sess.interner, tok.lexeme));
   return expr;
 }
 
 parse_char_literal :: (ctx: *ParsingContext) -> *Expr {
 
-  var tok: Token = expect(ctx, TokenKind::Char);
+  tok: Token = expect(ctx, TokenKind::Char);
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
   expr.node.lit.kind = LiteralKind::Char;
 
-  var sess: *Session = ctx.sess;
-  var s: *char = get_str(&sess.interner, tok.lexeme);
+  sess: *Session = ctx.sess;
+  s: *char = get_str(&sess.interner, tok.lexeme);
 
-  val len: u32 = strlen(s);
+  len: u32 = strlen(s);
   if len == 2 && s[0] == '\\' {
-    var c: char;
+    c: char;
     if s[1] == 'n'  c = '\n';
     else if s[1] == 't'  c = '\t';
     else if s[1] == 'r'  c = '\r';
@@ -258,9 +258,9 @@ parse_char_literal :: (ctx: *ParsingContext) -> *Expr {
 
 parse_string_literal :: (ctx: *ParsingContext) -> *Expr {
 
-  var tok: Token = expect(ctx, TokenKind::String);
+  tok: Token = expect(ctx, TokenKind::String);
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
   expr.node.lit.kind = LiteralKind::Str;
 
   expr.node.lit.value.str = tok.lexeme;
@@ -269,9 +269,9 @@ parse_string_literal :: (ctx: *ParsingContext) -> *Expr {
 
 parse_bool_literal :: (ctx: *ParsingContext) -> *Expr {
 
-  var tok: Token = consume(ctx);
+  tok: Token = consume(ctx);
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Literal);
   expr.node.lit.kind = LiteralKind::Bool;
   expr.node.lit.value.boolean = tok.kind == TokenKind::True;
   return expr;
@@ -279,14 +279,14 @@ parse_bool_literal :: (ctx: *ParsingContext) -> *Expr {
 
 parse_call :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 
-  var result: *Expr = ast_create_expr(ctx.ast, ExprKind::Call);
+  result: *Expr = ast_create_expr(ctx.ast, ExprKind::Call);
   result.node.call.func = left;
   result.node.call.args = malloc(8 * 16);
   result.node.call.num_args = 0;
 
   if !accept(ctx, TokenKind::RightParen) {
     while true {
-      var expr: *Expr = parse_expression(ctx, 0);
+      expr: *Expr = parse_expression(ctx, 0);
       result.node.call.args[result.node.call.num_args] = expr;
       result.node.call.num_args = result.node.call.num_args + 1;
       if !accept(ctx, TokenKind::Comma)  break;
@@ -299,9 +299,9 @@ parse_call :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 }
 
 parse_prefix_operator :: (ctx: *ParsingContext) -> *Expr {
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Unary);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Unary);
 
-  var tok: Token = consume(ctx);
+  tok: Token = consume(ctx);
 
   if tok.kind == TokenKind::Minus  expr.node.unary.op = UnaryOperatorKind::Negation;
   else if tok.kind == TokenKind::Bang  expr.node.unary.op = UnaryOperatorKind::Complement;
@@ -315,10 +315,10 @@ parse_prefix_operator :: (ctx: *ParsingContext) -> *Expr {
 }
 
 parse_binary_operator :: (ctx: *ParsingContext, left: *Expr, operator: BinaryOperatorKind) -> *Expr {
-  val precedence: u32 = get_binary_operator_precedence(operator);
-  val right: *Expr = parse_expression(ctx, precedence);
+  precedence: u32 = get_binary_operator_precedence(operator);
+  right: *Expr = parse_expression(ctx, precedence);
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Binary);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Binary);
   expr.node.binary.op = operator;
   expr.node.binary.left = left;
   expr.node.binary.right = right;
@@ -327,7 +327,7 @@ parse_binary_operator :: (ctx: *ParsingContext, left: *Expr, operator: BinaryOpe
 }
 
 parse_field_access :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Field);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Field);
   expr.node.field.ident = parse_identifier(ctx);
   expr.node.field.strct = left;
 
@@ -336,7 +336,7 @@ parse_field_access :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 
 parse_indexing :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Indexing);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Indexing);
   expr.node.indexing.index = parse_expression(ctx, 0);
   expr.node.indexing.array = left;
 
@@ -346,7 +346,7 @@ parse_indexing :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 }
 
 parse_assignment :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Assignment);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Assignment);
   expr.node.assignment.left = left;
   expr.node.assignment.right = parse_expression(ctx, 0);
 
@@ -360,7 +360,7 @@ parse_infix_operator :: (ctx: *ParsingContext, left: *Expr, tok: Token) -> *Expr
   if tok.kind == TokenKind::LeftBracket  return parse_indexing(ctx, left);
   if tok.kind == TokenKind::Equal  return parse_assignment(ctx, left);
 
-  val op: BinaryOperatorKind = convert_token_to_binary_operator(tok.kind);
+  op: BinaryOperatorKind = convert_token_to_binary_operator(tok.kind);
   if op != BinaryOperatorKind::Invalid {
     return parse_binary_operator(ctx, left, op);
   }
@@ -372,15 +372,15 @@ parse_stmt :: (ctx: *ParsingContext) -> *Expr;
 
 parse_block :: (ctx: *ParsingContext) -> *Block {
 
-  var block : *Block = malloc(sizeof(Block));
+  block : *Block = malloc(sizeof(Block));
   block.exprs = malloc(8 * 128);
   block.num_exprs = 0;
   block.span.from = span_start(ctx);
 
-  val next : Token = look_ahead(ctx, 0);
+  next : Token = look_ahead(ctx, 0);
   if next.kind == TokenKind::LeftCurly {
     expect(ctx, TokenKind::LeftCurly);
-    var i: u32 = 0;
+    i: u32 = 0;
     while !accept(ctx, TokenKind::RightCurly) {
       block.exprs[i] = parse_stmt(ctx);
       block.num_exprs = block.num_exprs + 1;
@@ -396,7 +396,7 @@ parse_block :: (ctx: *ParsingContext) -> *Block {
 }
 
 parse_block_expr :: (ctx: *ParsingContext) -> *Expr {
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Block);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Block);
   expr.node.block = parse_block(ctx);
   return expr;
 }
@@ -405,7 +405,7 @@ parse_if :: (ctx: *ParsingContext) -> *Expr {
 
   expect(ctx, TokenKind::If);
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Conditional);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Conditional);
   expr.node.conditional.condition = parse_expression(ctx, 0);
   expr.node.conditional.then = parse_block_expr(ctx);
 
@@ -421,7 +421,7 @@ parse_if :: (ctx: *ParsingContext) -> *Expr {
 parse_while :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::While);
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::While);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::While);
   expr.node.whl.condition = parse_expression(ctx, 0);
   expr.node.whl.body = parse_block_expr(ctx);
 
@@ -432,44 +432,30 @@ parse_sizeof :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::Sizeof);
   expect(ctx, TokenKind::LeftParen);
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Sizeof);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Sizeof);
   expr.node._sizeof = parse_expression(ctx, 0);
   expect(ctx, TokenKind::RightParen);
 
   return expr;
 }
 
-parse_let :: (ctx: *ParsingContext) -> *Expr {
-
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Let);
-  consume(ctx);
-  expr.node._let.pat = parse_pattern(ctx);
-  expect(ctx, TokenKind::Colon);
-  expr.node._let.ast_ty = parse_type(ctx);
-
-  if accept(ctx, TokenKind::Equal)  expr.node._let.value = parse_expression(ctx, 0);
-  else  expr.node._let.value = 0;
-
-  return expr;
-}
-
 parse_local_variable :: (ctx: *ParsingContext) -> *Expr {
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Local);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Local);
   expr.node.local.pat = parse_pattern(ctx);
   expect(ctx, TokenKind::Colon);
 
-  expr.node._let.ast_ty = parse_type(ctx);
+  expr.node.local.ast_ty = parse_type(ctx);
 
-  if accept(ctx, TokenKind::Equal)  expr.node._let.value = parse_expression(ctx, 0);
-  else  expr.node._let.value = 0;
+  if accept(ctx, TokenKind::Equal)  expr.node.local.value = parse_expression(ctx, 0);
+  else  expr.node.local.value = 0;
 
   return expr;
 }
 
 
 parse_control_flow :: (ctx: *ParsingContext) -> *Expr {
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::ControlFlow);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::ControlFlow);
   expr.node.control_flow_is_continue = accept(ctx, TokenKind::Continue);
 
   if !expr.node.control_flow_is_continue  expect(ctx, TokenKind::Break);
@@ -481,7 +467,7 @@ parse_cast :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::Cast);
   expect(ctx, TokenKind::LeftParen);
 
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Cast);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Cast);
   expr.node._cast.inner = parse_expression(ctx, 0);
   expect(ctx, TokenKind::Comma);
   expr.node._cast.ast_ty = parse_type(ctx);
@@ -492,18 +478,18 @@ parse_cast :: (ctx: *ParsingContext) -> *Expr {
 
 parse_return :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::Return);
-  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Return);
+  expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Return);
   expr.node._return = parse_expression(ctx, 0);
 
   return expr;
 }
 
 parse_expression :: (ctx: *ParsingContext, precedence: u32) -> *Expr {
-  val tok: Token = look_ahead(ctx, 0);
-  var span: Span;
+  tok: Token = look_ahead(ctx, 0);
+  span: Span;
   span.from = span_start(ctx);
 
-  var left : *Expr;
+  left : *Expr;
 
   if tok.kind == TokenKind::Integer  left = parse_integer_literal(ctx);
   else if tok.kind == TokenKind::Char  left = parse_char_literal(ctx);
@@ -525,7 +511,7 @@ parse_expression :: (ctx: *ParsingContext, precedence: u32) -> *Expr {
   else  emit_error(ctx.source_map, tok.span, "Invalid expression prefix");
 
   while precedence < get_current_precedence(ctx) {
-    val next_tok : Token = consume(ctx);
+    next_tok : Token = consume(ctx);
     left = parse_infix_operator(ctx, left, next_tok);
   }
   span.to = span_end(ctx);
@@ -536,17 +522,16 @@ parse_expression :: (ctx: *ParsingContext, precedence: u32) -> *Expr {
 
 parse_stmt :: (ctx: *ParsingContext) -> *Expr {
 
-  val tok: Token = look_ahead(ctx, 0);
-  val next: Token = look_ahead(ctx, 1);
-  var span: Span;
+  tok: Token = look_ahead(ctx, 0);
+  next: Token = look_ahead(ctx, 1);
+  span: Span;
   span.from = span_start(ctx);
 
-  var stmt: *Expr;
+  stmt: *Expr;
 
   if tok.kind == TokenKind::While  stmt = parse_while(ctx);
   else if tok.kind == TokenKind::Continue || tok.kind == TokenKind::Break  stmt = parse_control_flow(ctx);
   else if tok.kind == TokenKind::Return  stmt = parse_return(ctx);
-  else if tok.kind == TokenKind::Var || tok.kind == TokenKind::Val  stmt = parse_let(ctx);
   else if next.kind == TokenKind::Colon  stmt = parse_local_variable(ctx);
   else stmt = parse_expression(ctx, 0);
 
@@ -560,7 +545,7 @@ parse_stmt :: (ctx: *ParsingContext) -> *Expr {
 
 parse_generics :: (ctx: *ParsingContext) -> Generics {
   expect(ctx, TokenKind::Less);
-  var generics: Generics;
+  generics: Generics;
   generics.parameters = malloc(4 * sizeof(GenericParam));
   generics.num_parameters = 0;
 
@@ -605,13 +590,13 @@ parse_compound_decl :: (ctx: *ParsingContext, item: *Item) {
   item.node.compound.num_fields = 0;
 
   while !accept(ctx, TokenKind::RightCurly) {
-    val token: Token = consume(ctx);
+    token: Token = consume(ctx);
     if token.kind != TokenKind::Identifier  emit_error(ctx.source_map, token.span, "Expected field identifier");
 
     item.node.compound.fields[item.node.compound.num_fields].ident.name = token.lexeme;
     expect(ctx, TokenKind::Colon);
 
-    val type: *AstType = parse_type(ctx);
+    type: *AstType = parse_type(ctx);
     item.node.compound.fields[item.node.compound.num_fields].ast_ty = type;
     item.node.compound.num_fields = item.node.compound.num_fields + 1;
     expect(ctx, TokenKind::Comma);
@@ -641,7 +626,7 @@ parse_enum_decl :: (ctx: *ParsingContext, item: *Item) {
 }
 
 parse_function_header :: (ctx: *ParsingContext) -> FunctionHeader {
-  var header: FunctionHeader;
+  header: FunctionHeader;
 
   header.parameters = malloc(sizeof(FunctionParameter) * 16);
   header.num_parameters = 0;
@@ -656,7 +641,7 @@ parse_function_header :: (ctx: *ParsingContext) -> FunctionHeader {
     header.parameters[header.num_parameters].pat = parse_pattern(ctx);
 
     expect(ctx, TokenKind::Colon);
-    val type: *AstType = parse_type(ctx);
+    type: *AstType = parse_type(ctx);
     header.parameters[header.num_parameters].ast_ty = type;
     header.num_parameters = header.num_parameters + 1;
 
@@ -666,7 +651,7 @@ parse_function_header :: (ctx: *ParsingContext) -> FunctionHeader {
   if accept(ctx, TokenKind::Arrow)  header.output_ast_ty = parse_type(ctx);
   else {
     //TODO Cleanup when proper field access has been implemented
-    var output: *AstType = malloc(sizeof(AstType));
+    output: *AstType = malloc(sizeof(AstType));
     output.kind = AstTypeKind::Void;
     header.output_ast_ty = output;
   }
@@ -682,7 +667,7 @@ parse_function_decl :: (ctx: *ParsingContext, item: *Item) {
 
   expect(ctx, TokenKind::ColonColon);
 
-  var sess: *Session = ctx.sess;
+  sess: *Session = ctx.sess;
   if item.ident.name.x == intern(&sess.interner, "main").x  item.should_mangle = false;
 
   item.node.function.header = parse_function_header(ctx);
@@ -712,8 +697,8 @@ parse_mod :: (ctx: *ParsingContext, item: *Item) {
 
   if accept(ctx, TokenKind::LeftCurly)  item.node.module = parse_mod_inner(ctx, item.ident);
   else {
-    var sess: *Session = ctx.sess;
-    var path: *char = get_str(&sess.interner, item.ident.name);
+    sess: *Session = ctx.sess;
+    path: *char = get_str(&sess.interner, item.ident.name);
     item.node.module = parse_mod_external(ctx.sess, ctx.ast, path, ctx.current_module);
   }
 }
@@ -721,17 +706,17 @@ parse_mod :: (ctx: *ParsingContext, item: *Item) {
 
 parse_item :: (ctx: *ParsingContext) -> *Item {
 
-  var item: *Item = ast_create_item(ctx.ast);
+  item: *Item = ast_create_item(ctx.ast);
   item.span.from = span_start(ctx);
   item.should_mangle = !accept(ctx, TokenKind::Extern);
 
-  val tok : Token = look_ahead(ctx, 0);
+  tok : Token = look_ahead(ctx, 0);
 
   if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  parse_variable_decl(ctx, item);
   else if tok.kind == TokenKind::Use  parse_use(ctx, item);
   else if tok.kind == TokenKind::Mod  parse_mod(ctx, item);
   else if tok.kind == TokenKind::Identifier {
-    val next: Token = look_ahead(ctx, 2);
+    next: Token = look_ahead(ctx, 2);
     if next.kind == TokenKind::Struct || next.kind == TokenKind::Union  parse_compound_decl(ctx, item);
     else if next.kind == TokenKind::Enum  parse_enum_decl(ctx, item);
     else if next.kind == TokenKind::LeftParen  parse_function_decl(ctx, item);
@@ -746,7 +731,7 @@ parse_item :: (ctx: *ParsingContext) -> *Item {
 }
 
 parse_mod_inner :: (ctx: *ParsingContext, name: Ident) -> *Module {
-  var module: *Module = malloc(sizeof(Module));
+  module: *Module = malloc(sizeof(Module));
   module.span.from = span_start(ctx);
   module.items = malloc(8 * 2048);
   module.num_items = 0;
@@ -755,7 +740,7 @@ parse_mod_inner :: (ctx: *ParsingContext, name: Ident) -> *Module {
   module.num_indices = 1;
   module.parent = ctx.current_module;
 
-  var parent: *Module = module.parent;
+  parent: *Module = module.parent;
 
   if parent  module.path.num_segments = parent.path.num_segments + 1;
   else  module.path.num_segments = 1;
@@ -780,12 +765,12 @@ parse_mod_inner :: (ctx: *ParsingContext, name: Ident) -> *Module {
 
 parse_mod_external :: (sess: *Session, ast: *Ast, path: *char, parent: *Module) -> *Module {
 
-  var source_file: *SourceFile = source_map_new_file(&sess.source, sess.root_path, path);
+  source_file: *SourceFile = source_map_new_file(&sess.source, sess.root_path, path);
 
-  var num_tokens: u32;
-  var tokens: *Token = lex(sess, source_file, &num_tokens);
+  num_tokens: u32;
+  tokens: *Token = lex(sess, source_file, &num_tokens);
 
-  val ctx: ParsingContext;
+  ctx: ParsingContext;
   ctx.current_token = 0;
   ctx.tokens = tokens;
   ctx.num_tokens = num_tokens;
@@ -794,19 +779,19 @@ parse_mod_external :: (sess: *Session, ast: *Ast, path: *char, parent: *Module) 
   ctx.ast = ast;
   ctx.current_module = parent;
 
-  var name_ident: Ident;
+  name_ident: Ident;
   name_ident.name = intern(&sess.interner, path);
   name_ident.span.from = 0;
   name_ident.span.to = 0;
 
-  var module: *Module = parse_mod_inner(&ctx, name_ident);
+  module: *Module = parse_mod_inner(&ctx, name_ident);
 
   return module;
 }
 
 create_root_module :: (sess: *Session, ast: *Ast, path: *char) -> *Module {
 
-  var module: *Module = malloc(sizeof(Module));
+  module: *Module = malloc(sizeof(Module));
   module.items = malloc(8 * 2048);
   module.index_lookup = intmap_create(2048);
   module.index = malloc(sizeof(IndexEntry) * 2048);
@@ -814,11 +799,11 @@ create_root_module :: (sess: *Session, ast: *Ast, path: *char) -> *Module {
   module.parent = null;
   module.path.num_segments = 0;
 
-  var main_item: *Item = ast_create_item(ast);
+  main_item: *Item = ast_create_item(ast);
   main_item.kind = ItemKind::Module;
   main_item.ident.name = intern(&sess.interner, path);
 
-  var main_module: *Module = parse_mod_external(sess, ast, path, module);
+  main_module: *Module = parse_mod_external(sess, ast, path, module);
   main_item.span.from = main_module.span.from;
   main_item.span.to = main_module.span.to;
   main_item.node.module = main_module;
@@ -830,7 +815,7 @@ create_root_module :: (sess: *Session, ast: *Ast, path: *char) -> *Module {
 
 parse :: (sess: *Session, root_module_name: *char) -> Ast {
 
-  var ast: Ast;
+  ast: Ast;
 
   ast.items = malloc(sizeof(Item) * 2048);
   ast.num_items = 1; //Reserve zero idx for null item

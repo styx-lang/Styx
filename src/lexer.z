@@ -30,24 +30,24 @@ is_alphanumeric :: (c: char) -> bool {
 }
 
 is_done_lexing :: (ctx: *LexingContext) -> bool {
-  var source: *SourceFile = ctx.source;
+  source: *SourceFile = ctx.source;
   return ctx.current >= source.length
 }
 
 peek_token :: (ctx: *LexingContext, offset: u32) -> char {
   if is_done_lexing(ctx)  return 0
-  var source: *SourceFile = ctx.source;
+  source: *SourceFile = ctx.source;
   return source.content[ctx.current + offset]
 }
 
 advance :: (ctx: *LexingContext) -> char {
   ctx.current = ctx.current + 1
-  var source: *SourceFile = ctx.source;
+  source: *SourceFile = ctx.source;
   return source.content[ctx.current - 1]
 }
 
 add_token :: (ctx: *LexingContext, kind: TokenKind, lexeme: Sid) {
-  var token: Token;
+  token: Token;
   token.kind = kind;
   token.lexeme = lexeme;
   token.span.from = ctx.start + ctx.file_span_offset;
@@ -57,20 +57,20 @@ add_token :: (ctx: *LexingContext, kind: TokenKind, lexeme: Sid) {
 }
 
 add_simple_token :: (ctx: *LexingContext, kind: TokenKind) {
-  var null_sid: Sid;
+  null_sid: Sid;
   null_sid.x = 0;
   add_token(ctx, kind, null_sid);
 }
 
 add_lookahead_conditional_token :: (ctx: *LexingContext, expect: char, first: TokenKind, second: TokenKind) {
-  var kind: TokenKind;
+  kind: TokenKind;
   if peek_token(ctx,0) == expect {
     advance(ctx);
     kind = first;
   } else {
     kind = second;
   }
-  var null_sid: Sid;
+  null_sid: Sid;
   null_sid.x = 0;
   add_token(ctx, kind, null_sid);
 }
@@ -80,12 +80,12 @@ read_newline :: (ctx: *LexingContext) {
 }
 
 get_lexeme :: (ctx: *LexingContext, start_offset: u32, end_offset: u32) -> Sid {
-  val str_len: u32 = ctx.current - (ctx.start + start_offset + end_offset);
-  var source: *SourceFile = ctx.source;
+  str_len: u32 = ctx.current - (ctx.start + start_offset + end_offset);
+  source: *SourceFile = ctx.source;
   memcpy(ctx.lexeme_buffer, &source.content[ctx.start + start_offset], str_len);
   ctx.lexeme_buffer[str_len] = 0
-  var sess: *Session = ctx.sess;
-  var sid: Sid = intern(&sess.interner, ctx.lexeme_buffer);
+  sess: *Session = ctx.sess;
+  sid: Sid = intern(&sess.interner, ctx.lexeme_buffer);
   //printf("%s -> %u, %u\n", ctx.lexeme_buffer, sid.x, ctx.start);
   return sid;
 }
@@ -124,11 +124,11 @@ is_keyword :: (s: *char) -> TokenKind {
 
 lex_char :: (ctx: *LexingContext) {
 
-  var source: *SourceFile = ctx.source;
-  val start_line: u32 = source.num_lines + 1;
+  source: *SourceFile = ctx.source;
+  start_line: u32 = source.num_lines + 1;
 
   while (peek_token(ctx, 0) != '\'' || (peek_token(ctx, -1) == '\\' && peek_token(ctx, -2) != '\\')) && !is_done_lexing(ctx) {
-    var c: char = advance(ctx);
+    c: char = advance(ctx);
     if c == '\n'  read_newline(ctx);
   }
 
@@ -145,12 +145,12 @@ lex_char :: (ctx: *LexingContext) {
 
 lex_string :: (ctx: *LexingContext) {
 
-  var source: *SourceFile = ctx.source;
+  source: *SourceFile = ctx.source;
 
-  val start_line: u32 = source.num_lines + 1;
+  start_line: u32 = source.num_lines + 1;
 
   while (peek_token(ctx, 0) != '"' || (peek_token(ctx, -1) == '\\' && peek_token(ctx, -2) != '\\')) && !is_done_lexing(ctx) {
-    var c: char = advance(ctx);
+    c: char = advance(ctx);
     if c == '\n'  read_newline(ctx);
   }
 
@@ -168,14 +168,14 @@ lex_string :: (ctx: *LexingContext) {
 lex_number :: (ctx: *LexingContext) {
 
   while is_digit(peek_token(ctx,0))  advance(ctx);
-  var dot_encountered: bool = false;
+  dot_encountered: bool = false;
   if peek_token(ctx,0) == '.' && is_digit(peek_token(ctx,1)) {
     dot_encountered = true;
     advance(ctx);
     while is_digit(peek_token(ctx,0))  advance(ctx);
   }
 
-  var t: TokenKind;
+  t: TokenKind;
   if dot_encountered  t = TokenKind::Float;
   else  t = TokenKind::Integer;
 
@@ -185,17 +185,17 @@ lex_number :: (ctx: *LexingContext) {
 lex_identifier :: (ctx: *LexingContext) {
   while (is_alphanumeric(peek_token(ctx, 0)) || peek_token(ctx, 0) == '_') advance(ctx);
 
-  val lexeme: Sid = get_lexeme(ctx, 0, 0);
+  lexeme: Sid = get_lexeme(ctx, 0, 0);
 
-  var sess: *Session = ctx.sess;
-  val lexeme_str: *char = get_str(&sess.interner, lexeme);
-  val keyword: TokenKind = is_keyword(lexeme_str);
+  sess: *Session = ctx.sess;
+  lexeme_str: *char = get_str(&sess.interner, lexeme);
+  keyword: TokenKind = is_keyword(lexeme_str);
   if keyword != TokenKind::Invalid  add_simple_token(ctx, keyword);
   else  add_token(ctx, TokenKind::Identifier, lexeme);
 }
 
 scan_token :: (ctx: *LexingContext) {
-  val c: char = advance(ctx);
+  c: char = advance(ctx);
 
   //TODO Implement char literals such that we can replace the raw ASCII values here
   //TODO A match statement would also be quite nice here
@@ -225,13 +225,13 @@ scan_token :: (ctx: *LexingContext) {
     else  add_simple_token(ctx, TokenKind::Dot);
   }
   else if c == '<' {
-     val n1: char = peek_token(ctx, 0);
+     n1: char = peek_token(ctx, 0);
      if n1 == '<' {advance(ctx); add_simple_token(ctx, TokenKind::LessLess);}
      else if n1 == '=' {advance(ctx); add_simple_token(ctx, TokenKind::LessEqual);}
      else add_simple_token(ctx, TokenKind::Less);
   }
   else if c == '>' {
-     val n2: char = peek_token(ctx, 0);
+     n2: char = peek_token(ctx, 0);
      if n2 == '>' {advance(ctx); add_simple_token(ctx, TokenKind::GreaterGreater);}
      else if n2 == '=' {advance(ctx); add_simple_token(ctx, TokenKind::GreaterEqual);}
      else add_simple_token(ctx, TokenKind::Greater);
@@ -248,7 +248,7 @@ scan_token :: (ctx: *LexingContext) {
     if is_digit(c) lex_number(ctx);
     else if (is_alphabetic(c) || c == '_') lex_identifier(ctx);
     else {
-      var source: *SourceFile = ctx.source;
+      source: *SourceFile = ctx.source;
       printf("Unexpected character %c = %d on line %u\n", c, c, source.num_lines);
       abort();
     }
@@ -257,7 +257,7 @@ scan_token :: (ctx: *LexingContext) {
 
 lex :: (sess: *Session, source: *SourceFile, num_tokens: *u32) -> *Token {
 
-  var ctx: *LexingContext = malloc(sizeof(LexingContext));
+  ctx: *LexingContext = malloc(sizeof(LexingContext));
   ctx.source = source;
   ctx.file_span_offset = source.start;
   ctx.start = 0;

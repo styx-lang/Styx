@@ -76,13 +76,11 @@ BindingKind :: enum {
 Item :: struct {}
 EnumVariant :: struct {}
 FunctionParameter :: struct {}
-LetData :: struct {}
 LocalData :: struct {}
 PrimitiveTy :: struct {}
 
 BindingNode :: union {
   item: *Item,
-  variable: *LetData,
   local: *LocalData,
   parameter: *FunctionParameter,
   primitive: PrimitiveTy,
@@ -318,13 +316,6 @@ AssignmentData :: struct {
   right: *Expr,
 }
 
-LetData :: struct {
-  pat: Pattern,
-  value: *Expr,
-  ast_ty: *AstType,
-  ty: *Ty,
-}
-
 LocalData :: struct {
   pat: Pattern,
   value: *Expr,
@@ -346,7 +337,6 @@ ExprKind :: enum {
   Unary,
   While,
   Assignment,
-  Let,
   Local,
   Return,
   ControlFlow,
@@ -370,7 +360,6 @@ ExprKindNode :: union {
   whl: WhileData,
   assignment: AssignmentData,
   _return: *Expr,
-  _let: LetData,
   local: LocalData,
 }
 
@@ -484,7 +473,7 @@ Ast :: struct {
 }
 
 ast_create_expr :: (ast: *Ast, kind: ExprKind) -> *Expr {
-  var expr: *Expr = malloc(sizeof(Expr));
+  expr: *Expr = malloc(sizeof(Expr));
   expr.kind = kind;
 
   return expr;
@@ -492,7 +481,7 @@ ast_create_expr :: (ast: *Ast, kind: ExprKind) -> *Expr {
 
 ast_create_item :: (ast: *Ast) -> *Item {
 
-  var item: *Item = &ast.items[ast.num_items];
+  item: *Item = &ast.items[ast.num_items];
   ast.num_items = ast.num_items + 1;
 
   return item;
