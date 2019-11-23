@@ -1,33 +1,17 @@
-
-mod cstd;
-mod intmap;
-mod strmap;
-mod source_map;
-mod error;
-mod interning;
-mod session;
-mod tokens;
-mod lexer;
-mod ast;
-mod parser;
-mod resolution;
-mod typecheck;
-mod codegen;
-
-use self::cstd::*;
-use self::intmap::*;
-use self::strmap::*;
-use self::source_map::*;
-use self::error::*;
-use self::interning::*;
-use self::session::*;
-use self::tokens::*;
-use self::lexer::*;
-use self::ast::*;
-use self::parser::*;
-use self::resolution::*;
-use self::typecheck::*;
-use self::codegen::*;
+import cstd;
+import intmap;
+import strmap;
+import source_map;
+import error;
+import interning;
+import session;
+import tokens;
+import lexer;
+import ast;
+import parser;
+import resolution;
+import typecheck;
+import codegen;
 
 extern basename :: (path: *char) -> *char
 extern dirname :: (path: *char) -> *char
@@ -57,11 +41,11 @@ add_module :: (sess: *Session, target: *CompileTarget, path: Path, parent: *Modu
   i: i32 = 0;
   while i < module.num_items {
     item: *Item = &module.items[i];
-    if item.kind == ItemKind::Use {
+    if item.kind == ItemKind::Import {
       binding: Binding;
       binding.kind = BindingKind::Module;
-      binding.node.module = find_module(sess, target, item.node._use, parent);
-      item.node._use.binding = binding;
+      binding.node.module = find_module(sess, target, item.node._import, parent);
+      item.node._import.binding = binding;
     }
     i = i + 1;
   }

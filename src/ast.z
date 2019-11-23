@@ -1,8 +1,8 @@
-use super::cstd::*;
-use super::intmap::IntMap;
-use super::source_map::*;
-use super::interning::Sid;
-use super::error::*;
+import cstd;
+import intmap;
+import source_map;
+import interning;
+import error;
 
 AstType :: struct {}
 Expr :: struct {}
@@ -436,7 +436,7 @@ ItemKindNode :: union {
   _enum: EnumData,
   variable: VariableData,
   function: FunctionData,
-  _use: Path,
+  _import: Path,
 }
 
 ItemKind :: enum {
@@ -445,7 +445,7 @@ ItemKind :: enum {
   Function,
   Struct,
   Union,
-  Use,
+  Import,
   Variable,
 }
 

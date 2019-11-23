@@ -1,11 +1,11 @@
 
-use super::cstd::*;
-use super::intmap::*;
-use super::interning::*;
-use super::source_map::*;
-use super::ast::*;
-use super::error::*;
-use super::session::*;
+import cstd;
+import intmap;
+import interning;
+import source_map;
+import ast;
+import error;
+import session;
 
 CommonTypes :: struct {
   _void: *Ty,
@@ -528,7 +528,7 @@ check_function :: (ctx: *TypeContext, item: *Item) {
 check_item :: (ctx: *TypeContext, item: *Item) {
   if item.kind == ItemKind::Enum  {}
   else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  {}
-  else if item.kind == ItemKind::Use  {}
+  else if item.kind == ItemKind::Import  {}
   else if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  check_variable(ctx, item);
   else if item.kind == ItemKind::Function  check_function(ctx, item);
   else abort();

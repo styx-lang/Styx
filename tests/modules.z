@@ -1,10 +1,7 @@
 extern printf :: (format: *constchar, args: ...) -> i32
 
-mod module_b;
-mod module_c;
-
-use self::module_b::*;
-use self::module_c::C;
+import module_b;
+import module_c;
 
 main :: () {
   B1();

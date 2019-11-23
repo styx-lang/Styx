@@ -1,6 +1,6 @@
 
-use super::interning::*;
-use super::source_map::*;
+import interning;
+import source_map;
 
 SidBump1 :: struct {}
 

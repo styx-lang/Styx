@@ -27,9 +27,9 @@ extern fseek :: (stream: *FILE, offset: i64, origin: i32) -> i32;
 extern rewind :: (stream: *FILE);
 extern ftell :: (stream: *FILE) -> i64;
 
-val SEEK_SET: i32 = 0
-val SEEK_CUR: i32 = 1
-val SEEK_END: i32 = 2
+SEEK_SET :: i32 = 0
+SEEK_CUR :: i32 = 1
+SEEK_END :: i32 = 2
 
 extern printf :: (format: *constchar, args: ...) -> i32
 extern fprintf :: (stream: *FILE, format: *constchar, args: ...) -> i32

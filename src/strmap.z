@@ -1,5 +1,5 @@
 
-use super::cstd::*;
+import cstd;
 
 StrMap :: struct {
   keys: **char,

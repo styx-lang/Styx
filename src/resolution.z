@@ -1,10 +1,10 @@
-use super::cstd::*;
-use super::intmap::*;
-use super::interning::*;
-use super::source_map::*;
-use super::error::*;
-use super::ast::*;
-use super::session::*;
+import cstd;
+import intmap;
+import interning;
+import source_map;
+import error;
+import ast;
+import session;
 
 SymbolInfoKind :: enum {
   Local,
@@ -173,7 +173,7 @@ import_wildcard :: (ctx: *ResolutionContext, path: Path) {
   i: u32 = 0;
   while i < module.num_items {
     item: *Item = &module.items[i];
-    if item.kind != ItemKind::Use  add_item(ctx, module, item);
+    if item.kind != ItemKind::Import  add_item(ctx, module, item);
     i = i + 1;
   }
 }
@@ -184,7 +184,7 @@ index_module :: (ctx: *ResolutionContext, module: *Module) {
   while i < module.num_items {
     item: *Item = &module.items[i];
 
-    if item.kind == ItemKind::Use  import_wildcard(ctx, item.node._use);
+    if item.kind == ItemKind::Import  import_wildcard(ctx, item.node._import);
     else  add_item(ctx, module, item);
     i = i + 1;
   }

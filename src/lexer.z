@@ -1,9 +1,9 @@
 
-use super::cstd::*;
-use super::source_map::*;
-use super::interning::*;
-use super::session::*;
-use super::tokens::*;
+import cstd;
+import source_map;
+import interning;
+import session;
+import tokens;
 
 LexingContext :: struct {
   start: u32,
@@ -109,15 +109,12 @@ is_keyword :: (s: *char) -> TokenKind {
   if !strcmp(s, "fn")  return TokenKind::Fn;
   if !strcmp(s, "for")  return TokenKind::For;
   if !strcmp(s, "if")  return TokenKind::If;
-  if !strcmp(s, "mod") return TokenKind::Mod;
   if !strcmp(s, "return")  return TokenKind::Return;
   if !strcmp(s, "struct")  return TokenKind::Struct;
   if !strcmp(s, "sizeof")  return TokenKind::Sizeof;
   if !strcmp(s, "true")  return TokenKind::True;
   if !strcmp(s, "union")  return TokenKind::Union;
-  if !strcmp(s, "use")  return TokenKind::Use;
-  if !strcmp(s, "var")  return TokenKind::Var;
-  if !strcmp(s, "val")  return TokenKind::Val;
+  if !strcmp(s, "import")  return TokenKind::Import;
   if !strcmp(s, "while")  return TokenKind::While;
   return TokenKind::Invalid;
 }

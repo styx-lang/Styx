@@ -1,13 +1,13 @@
 
-use super::cstd::*;
-use super::intmap::*;
-use super::interning::*;
-use super::source_map::*;
-use super::error::*;
-use super::tokens::*;
-use super::lexer::*;
-use super::ast::*;
-use super::session::*;
+import cstd;
+import intmap;
+import interning;
+import source_map;
+import error;
+import tokens;
+import lexer;
+import ast;
+import session;
 
 ParsingContext :: struct {
   current_token: u64,
@@ -561,9 +561,6 @@ parse_generics :: (ctx: *ParsingContext) -> Generics {
 
 parse_variable_decl :: (ctx: *ParsingContext, item: *Item) {
 
-  if accept(ctx, TokenKind::Val)  item.kind = ItemKind::Const;
-  else if accept(ctx, TokenKind::Var)  item.kind = ItemKind::Variable;
-
   item.ident = parse_identifier(ctx);
   if accept(ctx, TokenKind::ColonColon)  item.kind = ItemKind::Const;
   else if accept(ctx, TokenKind::Colon)  item.kind = ItemKind::Variable;
@@ -677,11 +674,11 @@ parse_function_decl :: (ctx: *ParsingContext, item: *Item) {
   else  item.node.function.body = 0;
 }
 
-parse_use :: (ctx: *ParsingContext, item: *Item) {
-  expect(ctx, TokenKind::Use);
+parse_import :: (ctx: *ParsingContext, item: *Item) {
+  expect(ctx, TokenKind::Import);
 
-  item.kind = ItemKind::Use;
-  item.node._use = parse_path(ctx);
+  item.kind = ItemKind::Import;
+  item.node._import = parse_path(ctx);
   item.ident.name.x = 0
 
   accept(ctx, TokenKind::Semicolon);
@@ -693,13 +690,8 @@ parse_item :: (ctx: *ParsingContext, item: *Item) {
   item.should_mangle = !accept(ctx, TokenKind::Extern);
 
   tok : Token = look_ahead(ctx, 0);
-  while tok.kind == TokenKind::Mod  {
-    consume(ctx); consume(ctx); consume(ctx);
-    tok = look_ahead(ctx, 0);
-  }
 
-  if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  parse_variable_decl(ctx, item);
-  else if tok.kind == TokenKind::Use  parse_use(ctx, item);
+  if tok.kind == TokenKind::Import  parse_import(ctx, item);
   else if tok.kind == TokenKind::Identifier {
     next: Token = look_ahead(ctx, 2);
     if next.kind == TokenKind::Struct || next.kind == TokenKind::Union  parse_compound_decl(ctx, item);

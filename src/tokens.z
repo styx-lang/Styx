@@ -1,6 +1,6 @@
 
-use super::source_map::Span;
-use super::interning::Sid;
+import source_map;
+import interning;
 
 TokenKind :: enum {
     Invalid,
@@ -19,15 +19,12 @@ TokenKind :: enum {
     Fn,
     For,
     If,
-    Mod,
+    Import,
     Return,
     Static,
     Struct,
     Sizeof,
     Union,
-    Use,
-    Var,
-    Val,
     While,
     //Operators and punctuation
     Plus,

@@ -1,5 +1,5 @@
-use super::cstd::*;
-use super::strmap::*;
+import cstd;
+import strmap;
 
 Sid :: struct {
   x: u32,
