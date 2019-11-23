@@ -453,6 +453,20 @@ parse_let :: (ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
+parse_local_variable :: (ctx: *ParsingContext) -> *Expr {
+
+  var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Local);
+  expr.node.local.pat = parse_pattern(ctx);
+  expect(ctx, TokenKind::Colon);
+
+  expr.node._let.ast_ty = parse_type(ctx);
+
+  if accept(ctx, TokenKind::Equal)  expr.node._let.value = parse_expression(ctx, 0);
+  else  expr.node._let.value = 0;
+
+  return expr;
+}
+
 
 parse_control_flow :: (ctx: *ParsingContext) -> *Expr {
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::ControlFlow);
@@ -523,6 +537,7 @@ parse_expression :: (ctx: *ParsingContext, precedence: u32) -> *Expr {
 parse_stmt :: (ctx: *ParsingContext) -> *Expr {
 
   val tok: Token = look_ahead(ctx, 0);
+  val next: Token = look_ahead(ctx, 1);
   var span: Span;
   span.from = span_start(ctx);
 
@@ -532,6 +547,7 @@ parse_stmt :: (ctx: *ParsingContext) -> *Expr {
   else if tok.kind == TokenKind::Continue || tok.kind == TokenKind::Break  stmt = parse_control_flow(ctx);
   else if tok.kind == TokenKind::Return  stmt = parse_return(ctx);
   else if tok.kind == TokenKind::Var || tok.kind == TokenKind::Val  stmt = parse_let(ctx);
+  else if next.kind == TokenKind::Colon  stmt = parse_local_variable(ctx);
   else stmt = parse_expression(ctx, 0);
 
   span.to = span_end(ctx);
@@ -585,7 +601,7 @@ parse_compound_decl :: (ctx: *ParsingContext, item: *Item) {
 
   expect(ctx, TokenKind::LeftCurly);
 
-  item.node.compound.fields = malloc(sizeof(CompoundField) * 16);
+  item.node.compound.fields = malloc(sizeof(CompoundField) * 32);
   item.node.compound.num_fields = 0;
 
   while !accept(ctx, TokenKind::RightCurly) {

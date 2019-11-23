@@ -67,6 +67,7 @@ PrimitiveTy :: struct {
 BindingKind :: enum {
   Item,
   Variable,
+  Local,
   Parameter,
   PrimitiveType,
   Variant,
@@ -76,11 +77,13 @@ Item :: struct {}
 EnumVariant :: struct {}
 FunctionParameter :: struct {}
 LetData :: struct {}
+LocalData :: struct {}
 PrimitiveTy :: struct {}
 
 BindingNode :: union {
   item: *Item,
   variable: *LetData,
+  local: *LocalData,
   parameter: *FunctionParameter,
   primitive: PrimitiveTy,
   variant: *EnumVariant,
@@ -322,6 +325,13 @@ LetData :: struct {
   ty: *Ty,
 }
 
+LocalData :: struct {
+  pat: Pattern,
+  value: *Expr,
+  ast_ty: *AstType,
+  ty: *Ty,
+}
+
 ExprKind :: enum {
   Binary,
   Block,
@@ -337,6 +347,7 @@ ExprKind :: enum {
   While,
   Assignment,
   Let,
+  Local,
   Return,
   ControlFlow,
   Defer,
@@ -360,6 +371,7 @@ ExprKindNode :: union {
   assignment: AssignmentData,
   _return: *Expr,
   _let: LetData,
+  local: LocalData,
 }
 
 Expr :: struct {

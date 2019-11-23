@@ -22,14 +22,14 @@ D :: (n: u32) -> u32 {
 main :: () {
   A();
 
-  var b: u32 = B(2, 3);
+  b: u32 = B(2, 3);
   printf("%u\n", b);
 
-  var x: u32 = 42;
-  var y: u32 = 42;
+  x: u32 = 42;
+  y: u32 = 42;
   C(&x, y);
   printf("%u %u\n", x, y);
 
-  var f: u32 = D(22);
+  f: u32 = D(22);
   printf("%u\n", f);
 }

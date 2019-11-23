@@ -1,14 +1,14 @@
 extern printf :: (format: *constchar, args: ...) -> i32
 
 main :: () {
-  var u: u32 = 42;
+  u: u32 = 42;
   printf("%u\n", u);
-  var i: i32 = -12;
+  i: i32 = -12;
   printf("%d\n", i);
-  var c: char = 'X';
+  c: char = 'X';
   printf("%c\n", c);
-  var s: *char = "Are you suggesting that coconuts migrate?";
+  s: *char = "Are you suggesting that coconuts migrate?";
   printf("%s\n", s);
-  var l: u64 = 17179869184;
+  l: u64 = 17179869184;
   printf("%lu\n", l);
 }

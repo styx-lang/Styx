@@ -5,6 +5,6 @@ f<T> :: (T: t) -> T {
 }
 
 main :: () {
-  var a: u32 = 2;
+  a: u32 = 2;
   printf("%u\n", f(a));
 }

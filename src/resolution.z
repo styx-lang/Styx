@@ -7,11 +7,13 @@ use super::ast::*;
 
 VariableInfoKind :: enum {
   Variable,
+  Local,
   Parameter,
 }
 
 VariableInfoNode :: union {
   variable: *LetData,
+  local: *LocalData,
   parameter: *FunctionParameter,
 }
 
@@ -122,6 +124,16 @@ push_variable :: (ctx: *ResolutionContext, ident: Ident, data: *LetData) {
   v.num_variables = v.num_variables + 1;
 }
 
+push_local :: (ctx: *ResolutionContext, ident: Ident, data: *LocalData) {
+  var scope: *Scope = &ctx.scope_stack[ctx.stack_top];
+  if scope.kind != ScopeKind::VariableBlock  abort();
+  var v: *VariableBlock = &scope.node.variable;
+  v.variables[v.num_variables].ident = ident;
+  v.variables[v.num_variables].kind = VariableInfoKind::Local;
+  v.variables[v.num_variables].node.local = data;
+  v.num_variables = v.num_variables + 1;
+}
+
 push_module :: (ctx: *ResolutionContext, module: *Module) {
   ctx.stack_top = ctx.stack_top + 1;
   var scope: *Scope = &ctx.scope_stack[ctx.stack_top];
@@ -161,6 +173,10 @@ lookup :: (ctx: *ResolutionContext, ident: Ident) -> Path {
             if variable.kind == VariableInfoKind::Variable {
               path.binding.kind = BindingKind::Variable;
               path.binding.node.variable = variable.node.variable;
+            }
+            else if variable.kind == VariableInfoKind::Local {
+              path.binding.kind = BindingKind::Local;
+              path.binding.node.local = variable.node.local;
             }
             else if variable.kind == VariableInfoKind::Parameter {
               path.binding.kind = BindingKind::Parameter;
@@ -481,6 +497,12 @@ resolve_let :: (ctx: *ResolutionContext, data: *LetData) {
   if data.value  resolve_expr(ctx, data.value);
 }
 
+resolve_local :: (ctx: *ResolutionContext, data: *LocalData) {
+  push_local(ctx, data.pat.ident, data);
+  resolve_type(ctx, data.ast_ty);
+  if data.value  resolve_expr(ctx, data.value);
+}
+
 resolve_sizeof :: (ctx: *ResolutionContext, expr: *Expr) {
   resolve_expr(ctx, expr);
 }
@@ -502,6 +524,7 @@ resolve_expr :: (ctx: *ResolutionContext, expr: *Expr) {
   else if expr.kind == ExprKind::Path  resolve_path(ctx, &expr.node.path);
   else if expr.kind == ExprKind::Assignment  resolve_assignment(ctx, expr.node.assignment);
   else if expr.kind == ExprKind::Let  resolve_let(ctx, &expr.node._let);
+  else if expr.kind == ExprKind::Local  resolve_local(ctx, &expr.node.local);
   else if expr.kind == ExprKind::Return  resolve_expr(ctx, expr.node._return);
   else if expr.kind == ExprKind::Literal {}
   else if expr.kind == ExprKind::ControlFlow  {}

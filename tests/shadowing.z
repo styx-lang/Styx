@@ -1,10 +1,10 @@
 extern printf :: (format: *constchar, args: ...) -> i32
 
 main :: () {
-  var x: u32 = 12;
+  x: u32 = 12;
   printf("%u\n", x);
   {
-    var x: u32 = 42;
+    x: u32 = 42;
     printf("%u\n", x);
     x = 43;
     printf("%u\n", x);

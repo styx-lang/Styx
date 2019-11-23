@@ -1,7 +1,7 @@
 extern printf :: (format: *constchar, args: ...) -> i32
 
 main :: () {
-  var x: u32 = 1 + 2 * 3;
+  x: u32 = 1 + 2 * 3;
   printf("%u\n", x);
 
   x = 5 * 7 - 3;

@@ -1,9 +1,9 @@
 extern printf :: (format: *constchar, args: ...) -> i32
 
 main :: () {
-  var a: u32 = 1;
-  var b: u32 = 2;
-  var c: u32 = 3;
+  a: u32 = 1;
+  b: u32 = 2;
+  c: u32 = 3;
 
   if a < b {
     printf("A");

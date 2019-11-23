@@ -11,10 +11,10 @@ B :: struct {
 }
 
 main :: () {
-  var a: A;
+  a: A;
   a.x = 42;
   a.y = 12;
-  var b: B;
+  b: B;
   b.a = a;
   b.p = &a;
   printf("%u %u\n", a.x, a.y);

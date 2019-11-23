@@ -35,5 +35,5 @@ extern printf :: (format: *constchar, args: ...) -> i32
 extern fprintf :: (stream: *FILE, format: *constchar, args: ...) -> i32
 extern sprintf :: (buffer: *char, format: *constchar, args: ...) -> i32
 
-val null: *void = 0
-val EOF: i32 = -1
+null :: *void = 0
+EOF :: i32 = -1
