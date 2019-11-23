@@ -1,17 +1,17 @@
 use super::cstd::*;
 use super::strmap::*;
 
-struct Sid {
+Sid :: struct {
   x: u32,
 }
 
-struct Interner {
+Interner :: struct {
   str_lookup: *StrMap,
   sid_lookup: **char,
   next_sid: u32,
 }
 
-fn interner_create() -> Interner {
+interner_create :: () -> Interner {
   var interner: Interner;
   interner.str_lookup = strmap_create(2048);
   interner.sid_lookup = calloc(8, 2048);
@@ -20,7 +20,7 @@ fn interner_create() -> Interner {
 }
 
 
-fn intern(self: *Interner, string: *char) -> Sid  {
+intern :: (self: *Interner, string: *char) -> Sid  {
   var sid: Sid;
   sid.x = strmap_lookup(self.str_lookup, string);
   if sid.x == 0 {
@@ -38,6 +38,6 @@ fn intern(self: *Interner, string: *char) -> Sid  {
   return sid;
 }
 
-fn get_str(self: *Interner, sid: Sid) -> *char {
+get_str :: (self: *Interner, sid: Sid) -> *char {
   return self.sid_lookup[sid.x];
 }

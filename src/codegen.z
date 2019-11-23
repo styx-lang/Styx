@@ -5,7 +5,7 @@ use super::source_map::*;
 use super::error::*;
 use super::ast::*;
 
-struct CodegenContext {
+CodegenContext :: struct {
   out: *FILE,
   sess: *Session,
   ast: *Ast,
@@ -14,16 +14,16 @@ struct CodegenContext {
   interner: *Interner,
 }
 
-fn generate_expr(ctx: *CodegenContext, expr: *Expr)
-fn generate_block(ctx: *CodegenContext, block: *Block)
-fn generate_item(ctx: *CodegenContext, item: *Item)
+generate_expr :: (ctx: *CodegenContext, expr: *Expr)
+generate_block :: (ctx: *CodegenContext, block: *Block)
+generate_item :: (ctx: *CodegenContext, item: *Item)
 
-fn type_is_ptr(ty: *AstType) -> u32 {
+type_is_ptr :: (ty: *AstType) -> u32 {
    if ty.kind == AstTypeKind::Ptr  return 1;
    else return 0;
 }
 
-fn generate_prelude(ctx: *CodegenContext) {
+generate_prelude :: (ctx: *CodegenContext) {
   fprintf(ctx.out,"//Prelude\n");
   fprintf(ctx.out,"#include <stdint.h>\n");
   fprintf(ctx.out,"#include <stdbool.h>\n");
@@ -41,19 +41,19 @@ fn generate_prelude(ctx: *CodegenContext) {
   fprintf(ctx.out,"typedef const void constvoid;\n");
 }
 
-fn generate_sid(ctx: *CodegenContext, sid: Sid) {
+generate_sid :: (ctx: *CodegenContext, sid: Sid) {
   fprintf(ctx.out, "%s",  get_str(ctx.interner, sid));
 }
 
-fn generate_identifier(ctx: *CodegenContext, ident: Ident) {
+generate_identifier :: (ctx: *CodegenContext, ident: Ident) {
   generate_sid(ctx, ident.name);
 }
 
-fn generate_pattern(ctx: *CodegenContext, pat: Pattern) {
+generate_pattern :: (ctx: *CodegenContext, pat: Pattern) {
   generate_identifier(ctx, pat.ident);
 }
 
-fn mangle_path(ctx: *CodegenContext, path: Path) {
+mangle_path :: (ctx: *CodegenContext, path: Path) {
   val item: *Item = path.binding.node.item;
   if (path.binding.kind == BindingKind::Item && item.should_mangle) {
     fprintf(ctx.out, "_ZN");
@@ -72,7 +72,7 @@ fn mangle_path(ctx: *CodegenContext, path: Path) {
   }
 }
 
-fn mangle_path_and_ident(ctx: *CodegenContext, path: Path, ident: Ident) {
+mangle_path_and_ident :: (ctx: *CodegenContext, path: Path, ident: Ident) {
   fprintf(ctx.out, " _ZN");
   var i: u32 = 0;
   while i < path.num_segments {
@@ -84,11 +84,11 @@ fn mangle_path_and_ident(ctx: *CodegenContext, path: Path, ident: Ident) {
   fprintf(ctx.out, "%lu%sE", strlen(name), name);
 }
 
-fn mangle_function_name(ctx: *CodegenContext, module: *Module, ident: Ident, header: FunctionHeader) {
+mangle_function_name :: (ctx: *CodegenContext, module: *Module, ident: Ident, header: FunctionHeader) {
   mangle_path_and_ident(ctx, module.path, ident);
 }
 
-fn generate_ty(ctx: *CodegenContext, ty: *Ty) {
+generate_ty :: (ctx: *CodegenContext, ty: *Ty) {
   if ty.kind == TyKind::Void || ty.kind == TyKind::ConstVoid  fprintf(ctx.out, " void");
   else if ty.kind == TyKind::Char || ty.kind == TyKind::ConstChar  fprintf(ctx.out, " char");
   else if ty.kind == TyKind::Bool  fprintf(ctx.out, " bool");
@@ -115,7 +115,7 @@ fn generate_ty(ctx: *CodegenContext, ty: *Ty) {
   } else abort();
 }
 
-fn generate_char(ctx: *CodegenContext, c: char) {
+generate_char :: (ctx: *CodegenContext, c: char) {
   if c == '\n'  fprintf(ctx.out, "'\\n'");
   else if c == '\t'  fprintf(ctx.out, "'\\t'");
   else if c == '\r'  fprintf(ctx.out, "'\\r'");
@@ -124,7 +124,7 @@ fn generate_char(ctx: *CodegenContext, c: char) {
   else fprintf(ctx.out, "'%c'", c);
 }
 
-fn generate_literal(ctx: *CodegenContext, lit: Literal) {
+generate_literal :: (ctx: *CodegenContext, lit: Literal) {
   if lit.kind == LiteralKind::Int  fprintf(ctx.out, "%ld", lit.value.integer);
   else if lit.kind == LiteralKind::Float  fprintf(ctx.out, "%f", lit.value.floating);
   else if lit.kind == LiteralKind::Bool  if lit.value.boolean  fprintf(ctx.out, "true") else fprintf(ctx.out, "false");
@@ -135,7 +135,7 @@ fn generate_literal(ctx: *CodegenContext, lit: Literal) {
   else abort();
 }
 
-fn generate_unary(ctx: *CodegenContext, unary: UnaryData) {
+generate_unary :: (ctx: *CodegenContext, unary: UnaryData) {
   if unary.op == UnaryOperatorKind::Negation  fprintf(ctx.out, "-");
   else if unary.op == UnaryOperatorKind::Complement  fprintf(ctx.out, "!");
   else if unary.op == UnaryOperatorKind::Refer  fprintf(ctx.out, "&");
@@ -145,7 +145,7 @@ fn generate_unary(ctx: *CodegenContext, unary: UnaryData) {
   generate_expr(ctx, unary.inner);
 }
 
-fn generate_binary(ctx: *CodegenContext, binary: BinaryData) {
+generate_binary :: (ctx: *CodegenContext, binary: BinaryData) {
   fprintf(ctx.out, "(");
   generate_expr(ctx, binary.left);
   if binary.op == BinaryOperatorKind::Addition  fprintf(ctx.out, "+ ");
@@ -174,7 +174,7 @@ fn generate_binary(ctx: *CodegenContext, binary: BinaryData) {
   fprintf(ctx.out, ")");
 }
 
-fn generate_call(ctx: *CodegenContext, call: CallData) {
+generate_call :: (ctx: *CodegenContext, call: CallData) {
   generate_expr(ctx, call.func);
 
   fprintf(ctx.out, "(");
@@ -188,7 +188,7 @@ fn generate_call(ctx: *CodegenContext, call: CallData) {
   fprintf(ctx.out, ") ");
 }
 
-fn generate_conditional(ctx: *CodegenContext, cond: ConditionalData) {
+generate_conditional :: (ctx: *CodegenContext, cond: ConditionalData) {
   fprintf(ctx.out, "if (");
   generate_expr(ctx, cond.condition);
   fprintf(ctx.out, ")");
@@ -199,21 +199,21 @@ fn generate_conditional(ctx: *CodegenContext, cond: ConditionalData) {
   }
 }
 
-fn generate_while(ctx: *CodegenContext, data: WhileData) {
+generate_while :: (ctx: *CodegenContext, data: WhileData) {
   fprintf(ctx.out, "while ( ");
   generate_expr(ctx, data.condition);
   fprintf(ctx.out, ")\n");
   generate_expr(ctx, data.body);
 }
 
-fn generate_indexing(ctx: *CodegenContext, idx: IndexingData) {
+generate_indexing :: (ctx: *CodegenContext, idx: IndexingData) {
   generate_expr(ctx, idx.array);
   fprintf(ctx.out, "[");
   generate_expr(ctx, idx.index);
   fprintf(ctx.out, "]");
 }
 
-fn generate_field(ctx: *CodegenContext, field: FieldData) {
+generate_field :: (ctx: *CodegenContext, field: FieldData) {
   var strct: *Expr = field.strct;
   generate_expr(ctx, strct);
 
@@ -228,31 +228,31 @@ fn generate_field(ctx: *CodegenContext, field: FieldData) {
   fprintf(ctx.out, "%s%s", accessor_str, field_name);
 }
 
-fn generate_sizeof(ctx: *CodegenContext, expr: *Expr) {
+generate_sizeof :: (ctx: *CodegenContext, expr: *Expr) {
   fprintf(ctx.out, "sizeof(");
   generate_expr(ctx, expr);
   fprintf(ctx.out, ")");
 }
 
-fn generate_assignment(ctx: *CodegenContext, assignment: AssignmentData) {
+generate_assignment :: (ctx: *CodegenContext, assignment: AssignmentData) {
   generate_expr(ctx, assignment.left);
   fprintf(ctx.out, " = ");
   generate_expr(ctx, assignment.right);
   fprintf(ctx.out, ";\n");
 }
 
-fn generate_return(ctx: *CodegenContext, expr: *Expr) {
+generate_return :: (ctx: *CodegenContext, expr: *Expr) {
   fprintf(ctx.out, "return ");
   generate_expr(ctx, expr);
   fprintf(ctx.out, ";\n");
 }
 
-fn generate_control_flow(ctx: *CodegenContext, is_continue: bool) {
+generate_control_flow :: (ctx: *CodegenContext, is_continue: bool) {
   if is_continue  fprintf(ctx.out, "continue;\n");
   else  fprintf(ctx.out, "break;\n");
 }
 
-fn generate_let(ctx: *CodegenContext, data: LetData) {
+generate_let :: (ctx: *CodegenContext, data: LetData) {
 
   generate_ty(ctx, data.ty);
 
@@ -266,7 +266,7 @@ fn generate_let(ctx: *CodegenContext, data: LetData) {
   fprintf(ctx.out, ";\n");
 }
 
-fn generate_cast(ctx: *CodegenContext, data: CastData) {
+generate_cast :: (ctx: *CodegenContext, data: CastData) {
   fprintf(ctx.out, "((");
   generate_ty(ctx, data.ty);
   fprintf(ctx.out, ")(");
@@ -274,7 +274,7 @@ fn generate_cast(ctx: *CodegenContext, data: CastData) {
   fprintf(ctx.out, "))");
 }
 
-fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
+generate_expr :: (ctx: *CodegenContext, expr: *Expr) {
    if expr.kind == ExprKind::Unary  generate_unary(ctx, expr.node.unary);
    else if expr.kind == ExprKind::Binary  generate_binary(ctx, expr.node.binary);
    else if expr.kind == ExprKind::Block  generate_block(ctx, expr.node.block);
@@ -294,7 +294,7 @@ fn generate_expr(ctx: *CodegenContext, expr: *Expr) {
    else abort();
 }
 
-fn generate_block(ctx: *CodegenContext, block: *Block) {
+generate_block :: (ctx: *CodegenContext, block: *Block) {
   fprintf(ctx.out, "{\n");
   var i: u32 = 0;
 
@@ -308,7 +308,7 @@ fn generate_block(ctx: *CodegenContext, block: *Block) {
   fprintf(ctx.out, "}\n");
 }
 
-fn generate_variable(ctx: *CodegenContext, item: *Item) {
+generate_variable :: (ctx: *CodegenContext, item: *Item) {
 
   emit_line_directive(ctx.out, ctx.source, item.span);
 
@@ -324,7 +324,7 @@ fn generate_variable(ctx: *CodegenContext, item: *Item) {
   fprintf(ctx.out, ";\n");
 }
 
-fn generate_function(ctx: *CodegenContext, item: *Item) {
+generate_function :: (ctx: *CodegenContext, item: *Item) {
 
   emit_line_directive(ctx.out, ctx.source, item.span);
 
@@ -360,7 +360,7 @@ fn generate_function(ctx: *CodegenContext, item: *Item) {
   else  fprintf(ctx.out, ";\n");
 }
 
-fn generate_enum(ctx: *CodegenContext, item: *Item) {
+generate_enum :: (ctx: *CodegenContext, item: *Item) {
 
   var enum_name: *char = get_str(ctx.interner, item.ident.name);
   val module: *Module = ctx.current_module;
@@ -383,7 +383,7 @@ fn generate_enum(ctx: *CodegenContext, item: *Item) {
   fprintf(ctx.out, ";\n\n");
 }
 
-fn generate_compound(ctx: *CodegenContext, item: *Item) {
+generate_compound :: (ctx: *CodegenContext, item: *Item) {
 
   var compound_kind: *char;
   if item.kind == ItemKind::Struct  compound_kind = "struct";
@@ -420,7 +420,7 @@ fn generate_compound(ctx: *CodegenContext, item: *Item) {
   }
 }
 
-fn generate_mod(ctx: *CodegenContext, module: *Module) {
+generate_mod :: (ctx: *CodegenContext, module: *Module) {
   var old_module: *Module = ctx.current_module;
   ctx.current_module = module;
   var i: u32 = 0;
@@ -431,7 +431,7 @@ fn generate_mod(ctx: *CodegenContext, module: *Module) {
   ctx.current_module = old_module;
 }
 
-fn generate_item(ctx: *CodegenContext, item: *Item) {
+generate_item :: (ctx: *CodegenContext, item: *Item) {
 
   if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  generate_variable(ctx, item);
   else if item.kind == ItemKind::Enum   generate_enum(ctx, item);
@@ -441,7 +441,7 @@ fn generate_item(ctx: *CodegenContext, item: *Item) {
   fprintf(ctx.out, "\n");
 }
 
-fn generate(sess: *Session, ast: Ast, output_file: *char) {
+generate :: (sess: *Session, ast: Ast, output_file: *char) {
   var ctx: CodegenContext;
 
   ctx.out = fopen(output_file, "w");

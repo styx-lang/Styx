@@ -24,10 +24,10 @@ use self::resolution::resolve;
 use self::typecheck::check;
 use self::codegen::generate;
 
-extern fn basename(path: *char) -> *char
-extern fn dirname(path: *char) -> *char
+extern basename :: (path: *char) -> *char
+extern dirname :: (path: *char) -> *char
 
-fn main(argc: i32, argv: **char) -> i32 {
+main :: (argc: i32, argv: **char) -> i32 {
   if argc != 3 {
     printf("Usage: compiler INPUT OUTPUT\n");
     abort();

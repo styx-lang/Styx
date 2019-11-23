@@ -2,7 +2,7 @@
 use super::interning::Interner;
 use super::source_map::SourceMap;
 
-struct Session {
+Session :: struct {
   interner: Interner,
   source: SourceMap,
   root_path: *char,

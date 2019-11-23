@@ -1,14 +1,14 @@
 use super::cstd::*;
 use super::source_map::*;
 
-fn emit_error(m: *SourceMap, span: Span, msg: *char) {
+emit_error :: (m: *SourceMap, span: Span, msg: *char) {
   printf("error: %s\n", msg);
   source_snippet(m, span);
   abort();
 }
 
 
-fn emit_warning(m: *SourceMap, span: Span, msg: *char) {
+emit_warning :: (m: *SourceMap, span: Span, msg: *char) {
   printf("warning: %s\n", msg);
   source_snippet(m, span);
 }

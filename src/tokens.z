@@ -2,7 +2,7 @@
 use super::source_map::Span;
 use super::interning::Sid;
 
-enum TokenKind {
+TokenKind :: enum {
     Invalid,
     Identifier,
     EOF,
@@ -72,7 +72,7 @@ enum TokenKind {
     False,
 }
 
-struct Token {
+Token :: struct {
   kind: TokenKind,
   span: Span,
   lexeme: Sid,

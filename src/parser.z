@@ -8,7 +8,7 @@ use super::tokens::*;
 use super::lexer::*;
 use super::ast::*;
 
-struct ParsingContext {
+ParsingContext :: struct {
   current_token: u64,
   tokens: *Token,
   num_tokens: u64,
@@ -18,11 +18,11 @@ struct ParsingContext {
   ast: *Ast,
 }
 
-fn is_done_parsing(ctx: *ParsingContext) -> bool {
+is_done_parsing :: (ctx: *ParsingContext) -> bool {
   return ctx.num_tokens == ctx.current_token;
 }
 
-fn accept(ctx: *ParsingContext, token: TokenKind) -> bool {
+accept :: (ctx: *ParsingContext, token: TokenKind) -> bool {
   var tok : Token = ctx.tokens[ctx.current_token];
   if !is_done_parsing(ctx) && tok.kind == token {
     ctx.current_token = ctx.current_token + 1;
@@ -31,7 +31,7 @@ fn accept(ctx: *ParsingContext, token: TokenKind) -> bool {
   return false;
 }
 
-fn can_accept(ctx: *ParsingContext, token: TokenKind) -> bool {
+can_accept :: (ctx: *ParsingContext, token: TokenKind) -> bool {
   var tok : Token = ctx.tokens[ctx.current_token];
   if !is_done_parsing(ctx) && tok.kind == token {
     return true;
@@ -39,7 +39,7 @@ fn can_accept(ctx: *ParsingContext, token: TokenKind) -> bool {
   return false;
 }
 
-fn look_ahead(ctx: *ParsingContext, offset: u64) -> Token {
+look_ahead :: (ctx: *ParsingContext, offset: u64) -> Token {
   if ctx.current_token == ctx.num_tokens {
     var eof_tok: Token;
     eof_tok.kind = EOF;
@@ -47,12 +47,12 @@ fn look_ahead(ctx: *ParsingContext, offset: u64) -> Token {
   } else  return ctx.tokens[ctx.current_token + offset];
 }
 
-fn consume(ctx: *ParsingContext) -> Token {
+consume :: (ctx: *ParsingContext) -> Token {
   ctx.current_token = ctx.current_token + 1;
   return ctx.tokens[ctx.current_token - 1];
 }
 
-fn expect(ctx: *ParsingContext, kind: TokenKind) -> Token {
+expect :: (ctx: *ParsingContext, kind: TokenKind) -> Token {
   var tok: Token = consume(ctx);
   if tok.kind == kind {
     return tok;
@@ -62,15 +62,15 @@ fn expect(ctx: *ParsingContext, kind: TokenKind) -> Token {
   }
 }
 
-fn span_start(ctx: *ParsingContext) -> u32 {
+span_start :: (ctx: *ParsingContext) -> u32 {
   return ctx.tokens[ctx.current_token].span.from;
 }
 
-fn span_end(ctx: *ParsingContext) -> u32 {
+span_end :: (ctx: *ParsingContext) -> u32 {
   return ctx.tokens[ctx.current_token - 1].span.to;
 }
 
-fn parse_identifier(ctx: *ParsingContext) -> Ident {
+parse_identifier :: (ctx: *ParsingContext) -> Ident {
 
   var ident: Ident;
   ident.span.from = span_start(ctx);
@@ -84,7 +84,7 @@ fn parse_identifier(ctx: *ParsingContext) -> Ident {
   return ident;
 }
 
-fn parse_path(ctx: *ParsingContext) -> Path {
+parse_path :: (ctx: *ParsingContext) -> Path {
   var path: Path;
   path.segments = malloc(sizeof(Ident) * 6);
   path.num_segments = 0;
@@ -104,13 +104,13 @@ fn parse_path(ctx: *ParsingContext) -> Path {
   return path;
 }
 
-fn parse_path_expr(ctx: *ParsingContext) -> *Expr {
+parse_path_expr :: (ctx: *ParsingContext) -> *Expr {
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Path);
   expr.node.path = parse_path(ctx);
   return expr;
 }
 
-fn parse_pattern(ctx: *ParsingContext) -> Pattern {
+parse_pattern :: (ctx: *ParsingContext) -> Pattern {
   var pat: Pattern;
   pat.span.from = span_start(ctx);
   pat.ident = parse_identifier(ctx);
@@ -118,7 +118,7 @@ fn parse_pattern(ctx: *ParsingContext) -> Pattern {
   return pat;
 }
 
-fn parse_type(ctx: *ParsingContext) -> *AstType {
+parse_type :: (ctx: *ParsingContext) -> *AstType {
   var node: AstTypeKindNode;
   var kind: AstTypeKind;
 
@@ -143,7 +143,7 @@ fn parse_type(ctx: *ParsingContext) -> *AstType {
   return type;
 }
 
-fn convert_token_to_binary_operator(tok: TokenKind) -> BinaryOperatorKind {
+convert_token_to_binary_operator :: (tok: TokenKind) -> BinaryOperatorKind {
   if tok == TokenKind::Plus  return BinaryOperatorKind::Addition;
   else if tok == TokenKind::Minus  return BinaryOperatorKind::Subtraction;
   else if tok == TokenKind::Star  return BinaryOperatorKind::Product;
@@ -165,7 +165,7 @@ fn convert_token_to_binary_operator(tok: TokenKind) -> BinaryOperatorKind {
   else  return BinaryOperatorKind::Invalid;
 }
 
-fn get_binary_operator_precedence(op: BinaryOperatorKind) -> u32 {
+get_binary_operator_precedence :: (op: BinaryOperatorKind) -> u32 {
   if op == BinaryOperatorKind::Product  return 10;
   else if op == BinaryOperatorKind::Division  return 10;
   else if op == BinaryOperatorKind::Modulus  return 10;
@@ -187,7 +187,7 @@ fn get_binary_operator_precedence(op: BinaryOperatorKind) -> u32 {
   else return 0;
 }
 
-fn get_current_precedence(ctx: *ParsingContext) -> u32 {
+get_current_precedence :: (ctx: *ParsingContext) -> u32 {
 
   if ctx.num_tokens <= ctx.current_token {
     return 0;
@@ -202,9 +202,9 @@ fn get_current_precedence(ctx: *ParsingContext) -> u32 {
   }
 }
 
-fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr
+parse_expression :: (ctx: *ParsingContext, precedence: u32) -> *Expr
 
-fn parse_integer_literal(ctx: *ParsingContext) -> *Expr {
+parse_integer_literal :: (ctx: *ParsingContext) -> *Expr {
 
   var tok: Token = expect(ctx, TokenKind::Integer);
 
@@ -216,7 +216,7 @@ fn parse_integer_literal(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_float_literal(ctx: *ParsingContext) -> *Expr {
+parse_float_literal :: (ctx: *ParsingContext) -> *Expr {
 
   var tok: Token = expect(ctx, TokenKind::Float);
 
@@ -228,7 +228,7 @@ fn parse_float_literal(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_char_literal(ctx: *ParsingContext) -> *Expr {
+parse_char_literal :: (ctx: *ParsingContext) -> *Expr {
 
   var tok: Token = expect(ctx, TokenKind::Char);
 
@@ -256,7 +256,7 @@ fn parse_char_literal(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_string_literal(ctx: *ParsingContext) -> *Expr {
+parse_string_literal :: (ctx: *ParsingContext) -> *Expr {
 
   var tok: Token = expect(ctx, TokenKind::String);
 
@@ -267,7 +267,7 @@ fn parse_string_literal(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_bool_literal(ctx: *ParsingContext) -> *Expr {
+parse_bool_literal :: (ctx: *ParsingContext) -> *Expr {
 
   var tok: Token = consume(ctx);
 
@@ -277,7 +277,7 @@ fn parse_bool_literal(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_call(ctx: *ParsingContext, left: *Expr) -> *Expr {
+parse_call :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 
   var result: *Expr = ast_create_expr(ctx.ast, ExprKind::Call);
   result.node.call.func = left;
@@ -298,7 +298,7 @@ fn parse_call(ctx: *ParsingContext, left: *Expr) -> *Expr {
 
 }
 
-fn parse_prefix_operator(ctx: *ParsingContext) -> *Expr {
+parse_prefix_operator :: (ctx: *ParsingContext) -> *Expr {
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Unary);
 
   var tok: Token = consume(ctx);
@@ -314,7 +314,7 @@ fn parse_prefix_operator(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_binary_operator(ctx: *ParsingContext, left: *Expr, operator: BinaryOperatorKind) -> *Expr {
+parse_binary_operator :: (ctx: *ParsingContext, left: *Expr, operator: BinaryOperatorKind) -> *Expr {
   val precedence: u32 = get_binary_operator_precedence(operator);
   val right: *Expr = parse_expression(ctx, precedence);
 
@@ -326,7 +326,7 @@ fn parse_binary_operator(ctx: *ParsingContext, left: *Expr, operator: BinaryOper
   return expr;
 }
 
-fn parse_field_access(ctx: *ParsingContext, left: *Expr) -> *Expr {
+parse_field_access :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Field);
   expr.node.field.ident = parse_identifier(ctx);
   expr.node.field.strct = left;
@@ -334,7 +334,7 @@ fn parse_field_access(ctx: *ParsingContext, left: *Expr) -> *Expr {
   return expr;
 }
 
-fn parse_indexing(ctx: *ParsingContext, left: *Expr) -> *Expr {
+parse_indexing :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
 
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Indexing);
   expr.node.indexing.index = parse_expression(ctx, 0);
@@ -345,7 +345,7 @@ fn parse_indexing(ctx: *ParsingContext, left: *Expr) -> *Expr {
   return expr;
 }
 
-fn parse_assignment(ctx: *ParsingContext, left: *Expr) -> *Expr {
+parse_assignment :: (ctx: *ParsingContext, left: *Expr) -> *Expr {
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Assignment);
   expr.node.assignment.left = left;
   expr.node.assignment.right = parse_expression(ctx, 0);
@@ -353,7 +353,7 @@ fn parse_assignment(ctx: *ParsingContext, left: *Expr) -> *Expr {
   return expr;
 }
 
-fn parse_infix_operator(ctx: *ParsingContext, left: *Expr, tok: Token) -> *Expr {
+parse_infix_operator :: (ctx: *ParsingContext, left: *Expr, tok: Token) -> *Expr {
 
   if tok.kind == TokenKind::LeftParen  return parse_call(ctx, left);
   if tok.kind == TokenKind::Dot  return parse_field_access(ctx, left);
@@ -368,7 +368,7 @@ fn parse_infix_operator(ctx: *ParsingContext, left: *Expr, tok: Token) -> *Expr 
   return null;
 }
 
-fn parse_block(ctx: *ParsingContext) -> *Block {
+parse_block :: (ctx: *ParsingContext) -> *Block {
 
   var block : *Block = malloc(sizeof(Block));
   block.exprs = malloc(8 * 128);
@@ -393,13 +393,13 @@ fn parse_block(ctx: *ParsingContext) -> *Block {
   return block;
 }
 
-fn parse_block_expr(ctx: *ParsingContext) -> *Expr {
+parse_block_expr :: (ctx: *ParsingContext) -> *Expr {
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Block);
   expr.node.block = parse_block(ctx);
   return expr;
 }
 
-fn parse_if(ctx: *ParsingContext) -> *Expr {
+parse_if :: (ctx: *ParsingContext) -> *Expr {
 
   expect(ctx, TokenKind::If);
 
@@ -416,7 +416,7 @@ fn parse_if(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_while(ctx: *ParsingContext) -> *Expr {
+parse_while :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::While);
 
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::While);
@@ -426,7 +426,7 @@ fn parse_while(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_sizeof(ctx: *ParsingContext) -> *Expr {
+parse_sizeof :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::Sizeof);
   expect(ctx, TokenKind::LeftParen);
 
@@ -437,7 +437,7 @@ fn parse_sizeof(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_let(ctx: *ParsingContext) -> *Expr {
+parse_let :: (ctx: *ParsingContext) -> *Expr {
 
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Let);
   consume(ctx);
@@ -452,7 +452,7 @@ fn parse_let(ctx: *ParsingContext) -> *Expr {
 }
 
 
-fn parse_control_flow(ctx: *ParsingContext) -> *Expr {
+parse_control_flow :: (ctx: *ParsingContext) -> *Expr {
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::ControlFlow);
   expr.node.control_flow_is_continue = accept(ctx, TokenKind::Continue);
 
@@ -461,7 +461,7 @@ fn parse_control_flow(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_cast(ctx: *ParsingContext) -> *Expr {
+parse_cast :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::Cast);
   expect(ctx, TokenKind::LeftParen);
 
@@ -474,7 +474,7 @@ fn parse_cast(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_return(ctx: *ParsingContext) -> *Expr {
+parse_return :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::Return);
   var expr: *Expr = ast_create_expr(ctx.ast, ExprKind::Return);
   expr.node._return = parse_expression(ctx, 0);
@@ -482,7 +482,7 @@ fn parse_return(ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
-fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
+parse_expression :: (ctx: *ParsingContext, precedence: u32) -> *Expr {
   val tok: Token = look_ahead(ctx, 0);
   var span: Span;
   span.from = span_start(ctx);
@@ -524,7 +524,7 @@ fn parse_expression(ctx: *ParsingContext, precedence: u32) -> *Expr {
   return left;
 }
 
-fn parse_generics(ctx: *ParsingContext) -> Generics {
+parse_generics :: (ctx: *ParsingContext) -> Generics {
   expect(ctx, TokenKind::Less);
   var generics: Generics;
   generics.parameters = malloc(4 * sizeof(GenericParam));
@@ -539,7 +539,7 @@ fn parse_generics(ctx: *ParsingContext) -> Generics {
   return generics;
 }
 
-fn parse_variable_decl(ctx: *ParsingContext, item: *Item) {
+parse_variable_decl :: (ctx: *ParsingContext, item: *Item) {
 
   if accept(ctx, TokenKind::Val)  item.kind = ItemKind::Const;
   else if accept(ctx, TokenKind::Var)  item.kind = ItemKind::Variable;
@@ -553,7 +553,7 @@ fn parse_variable_decl(ctx: *ParsingContext, item: *Item) {
   else  item.node.variable.body = 0;
 }
 
-fn parse_compound_decl(ctx: *ParsingContext, item: *Item) {
+parse_compound_decl :: (ctx: *ParsingContext, item: *Item) {
 
   if accept(ctx, TokenKind::Struct)  item.kind = ItemKind::Struct;
   else if accept(ctx, TokenKind::Union)  item.kind = ItemKind::Union;
@@ -587,7 +587,7 @@ fn parse_compound_decl(ctx: *ParsingContext, item: *Item) {
 }
 
 
-fn parse_enum_decl(ctx: *ParsingContext, item: *Item) {
+parse_enum_decl :: (ctx: *ParsingContext, item: *Item) {
 
   accept(ctx, TokenKind::Enum);
   item.kind = ItemKind::Enum;
@@ -610,7 +610,7 @@ fn parse_enum_decl(ctx: *ParsingContext, item: *Item) {
   }
 }
 
-fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
+parse_function_header :: (ctx: *ParsingContext) -> FunctionHeader {
   var header: FunctionHeader;
 
   header.parameters = malloc(sizeof(FunctionParameter) * 16);
@@ -644,7 +644,7 @@ fn parse_function_header(ctx: *ParsingContext) -> FunctionHeader {
   return header;
 }
 
-fn parse_function_decl(ctx: *ParsingContext, item: *Item) {
+parse_function_decl :: (ctx: *ParsingContext, item: *Item) {
 
   item.kind = ItemKind::Function;
 
@@ -663,7 +663,7 @@ fn parse_function_decl(ctx: *ParsingContext, item: *Item) {
   else  item.node.function.body = 0;
 }
 
-fn parse_use(ctx: *ParsingContext, item: *Item) {
+parse_use :: (ctx: *ParsingContext, item: *Item) {
   expect(ctx, TokenKind::Use);
 
   item.kind = ItemKind::Use;
@@ -673,10 +673,10 @@ fn parse_use(ctx: *ParsingContext, item: *Item) {
   accept(ctx, TokenKind::Semicolon);
 }
 
-fn parse_mod_inner(ctx: *ParsingContext, name: Ident) -> *Module
-fn parse_mod_external(sess: *Session, ast: *Ast, path: *char, parent: *Module) -> *Module
+parse_mod_inner :: (ctx: *ParsingContext, name: Ident) -> *Module
+parse_mod_external :: (sess: *Session, ast: *Ast, path: *char, parent: *Module) -> *Module
 
-fn parse_mod(ctx: *ParsingContext, item: *Item) {
+parse_mod :: (ctx: *ParsingContext, item: *Item) {
   expect(ctx, TokenKind::Mod);
 
   item.ident = parse_identifier(ctx);
@@ -691,7 +691,7 @@ fn parse_mod(ctx: *ParsingContext, item: *Item) {
 }
 
 
-fn parse_item(ctx: *ParsingContext) -> *Item {
+parse_item :: (ctx: *ParsingContext) -> *Item {
 
   var item: *Item = ast_create_item(ctx.ast);
   item.span.from = span_start(ctx);
@@ -699,19 +699,15 @@ fn parse_item(ctx: *ParsingContext) -> *Item {
 
   val tok : Token = look_ahead(ctx, 0);
 
-  if tok.kind == TokenKind::Fn   parse_function_decl(ctx, item);
-  else if tok.kind == TokenKind::Struct || tok.kind == TokenKind::Union  parse_compound_decl(ctx, item);
-  else if tok.kind == TokenKind::Enum  parse_enum_decl(ctx, item);
-  else if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  parse_variable_decl(ctx, item);
+  if tok.kind == TokenKind::Var  || tok.kind == TokenKind::Val  parse_variable_decl(ctx, item);
   else if tok.kind == TokenKind::Use  parse_use(ctx, item);
   else if tok.kind == TokenKind::Mod  parse_mod(ctx, item);
   else if tok.kind == TokenKind::Identifier {
     val next: Token = look_ahead(ctx, 2);
     if next.kind == TokenKind::Struct || next.kind == TokenKind::Union  parse_compound_decl(ctx, item);
     else if next.kind == TokenKind::Enum  parse_enum_decl(ctx, item);
-    else if next.kind == TokenKind::Var  parse_variable_decl(ctx, item);
     else if next.kind == TokenKind::LeftParen  parse_function_decl(ctx, item);
-    else  emit_error(ctx.source_map, tok.span, "Unexpected token on top-level");
+    else parse_variable_decl(ctx, item);
   }
   else  emit_error(ctx.source_map, tok.span, "Unexpected token on top-level");
 
@@ -721,7 +717,7 @@ fn parse_item(ctx: *ParsingContext) -> *Item {
   return item;
 }
 
-fn parse_mod_inner(ctx: *ParsingContext, name: Ident) -> *Module {
+parse_mod_inner :: (ctx: *ParsingContext, name: Ident) -> *Module {
   var module: *Module = malloc(sizeof(Module));
   module.span.from = span_start(ctx);
   module.items = malloc(8 * 2048);
@@ -754,7 +750,7 @@ fn parse_mod_inner(ctx: *ParsingContext, name: Ident) -> *Module {
   return module;
 }
 
-fn parse_mod_external(sess: *Session, ast: *Ast, path: *char, parent: *Module) -> *Module {
+parse_mod_external :: (sess: *Session, ast: *Ast, path: *char, parent: *Module) -> *Module {
 
   var source_file: *SourceFile = source_map_new_file(&sess.source, sess.root_path, path);
 
@@ -780,7 +776,7 @@ fn parse_mod_external(sess: *Session, ast: *Ast, path: *char, parent: *Module) -
   return module;
 }
 
-fn create_root_module(sess: *Session, ast: *Ast, path: *char) -> *Module {
+create_root_module :: (sess: *Session, ast: *Ast, path: *char) -> *Module {
 
   var module: *Module = malloc(sizeof(Module));
   module.items = malloc(8 * 2048);
@@ -804,7 +800,7 @@ fn create_root_module(sess: *Session, ast: *Ast, path: *char) -> *Module {
   return module;
 }
 
-fn parse(sess: *Session, root_module_name: *char) -> Ast {
+parse :: (sess: *Session, root_module_name: *char) -> Ast {
 
   var ast: Ast;
 

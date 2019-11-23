@@ -1,39 +1,39 @@
 
-extern fn malloc(size: u64) -> *void
-extern fn calloc(size: u64, count: u64) -> *void
-extern fn free(ptr: *void)
+extern malloc :: (size: u64) -> *void
+extern calloc :: (size: u64, count: u64) -> *void
+extern free :: (ptr: *void)
 
-extern fn memset(dest: *void, ch: i32, size: u64) -> *void
-extern fn memcpy(dest: *void, src: *constvoid, size: u64) -> *void
-extern fn strcmp(lhs: *constchar, rhs: *constchar) -> i32
-extern fn strlen(str: *constchar) -> u64
-extern fn strtok(str: *char, delim: *constchar) -> *char
+extern memset :: (dest: *void, ch: i32, size: u64) -> *void
+extern memcpy :: (dest: *void, src: *constvoid, size: u64) -> *void
+extern strcmp :: (lhs: *constchar, rhs: *constchar) -> i32
+extern strlen :: (str: *constchar) -> u64
+extern strtok :: (str: *char, delim: *constchar) -> *char
 
-extern fn atof(str: *constchar) -> f64
-extern fn atol(str: *constchar) -> i64
+extern atof :: (str: *constchar) -> f64
+extern atol :: (str: *constchar) -> i64
 
-extern fn abort();
-extern fn exit(status: i32);
+extern abort :: ();
+extern exit :: (status: i32);
 
-struct FILE {}
+FILE :: struct {}
 
-extern fn fopen(filename: *constchar, mode: *constchar) -> *FILE
-extern fn fclose(stream: *FILE) -> i32
+extern fopen :: (filename: *constchar, mode: *constchar) -> *FILE
+extern fclose :: (stream: *FILE) -> i32
 
-extern fn fread(buffer: *void, size: u64, count: u64, stream: *FILE) -> u64
-extern fn fwrite(buffer: *constvoid, size: u64, count: u64, stream: *FILE) -> u64
+extern fread :: (buffer: *void, size: u64, count: u64, stream: *FILE) -> u64
+extern fwrite :: (buffer: *constvoid, size: u64, count: u64, stream: *FILE) -> u64
 
-extern fn fseek(stream: *FILE, offset: i64, origin: i32) -> i32;
-extern fn rewind(stream: *FILE);
-extern fn ftell(stream: *FILE) -> i64;
+extern fseek :: (stream: *FILE, offset: i64, origin: i32) -> i32;
+extern rewind :: (stream: *FILE);
+extern ftell :: (stream: *FILE) -> i64;
 
 val SEEK_SET: i32 = 0
 val SEEK_CUR: i32 = 1
 val SEEK_END: i32 = 2
 
-extern fn printf(format: *constchar, args: ...) -> i32
-extern fn fprintf(stream: *FILE, format: *constchar, args: ...) -> i32
-extern fn sprintf(buffer: *char, format: *constchar, args: ...) -> i32
+extern printf :: (format: *constchar, args: ...) -> i32
+extern fprintf :: (stream: *FILE, format: *constchar, args: ...) -> i32
+extern sprintf :: (buffer: *char, format: *constchar, args: ...) -> i32
 
 val null: *void = 0
 val EOF: i32 = -1

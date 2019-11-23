@@ -5,7 +5,7 @@ use super::interning::*;
 use super::session::*;
 use super::tokens::*;
 
-struct LexingContext {
+LexingContext :: struct {
   start: u32,
   current: u32,
   line: u32,
@@ -17,36 +17,36 @@ struct LexingContext {
   lexeme_buffer: *char,
 }
 
-fn is_alphabetic(c: char) -> bool {
+is_alphabetic :: (c: char) -> bool {
   return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
 }
 
-fn is_digit(c: char) -> bool {
+is_digit :: (c: char) -> bool {
   return c >= '0' && c <= '9'
 }
 
-fn is_alphanumeric(c: char) -> bool {
+is_alphanumeric :: (c: char) -> bool {
   return is_alphabetic(c) || is_digit(c)
 }
 
-fn is_done_lexing(ctx: *LexingContext) -> bool {
+is_done_lexing :: (ctx: *LexingContext) -> bool {
   var source: *SourceFile = ctx.source;
   return ctx.current >= source.length
 }
 
-fn peek_token(ctx: *LexingContext, offset: u32) -> char {
+peek_token :: (ctx: *LexingContext, offset: u32) -> char {
   if is_done_lexing(ctx)  return 0
   var source: *SourceFile = ctx.source;
   return source.content[ctx.current + offset]
 }
 
-fn advance(ctx: *LexingContext) -> char {
+advance :: (ctx: *LexingContext) -> char {
   ctx.current = ctx.current + 1
   var source: *SourceFile = ctx.source;
   return source.content[ctx.current - 1]
 }
 
-fn add_token(ctx: *LexingContext, kind: TokenKind, lexeme: Sid) {
+add_token :: (ctx: *LexingContext, kind: TokenKind, lexeme: Sid) {
   var token: Token;
   token.kind = kind;
   token.lexeme = lexeme;
@@ -56,13 +56,13 @@ fn add_token(ctx: *LexingContext, kind: TokenKind, lexeme: Sid) {
   ctx.current_token_idx = ctx.current_token_idx + 1;
 }
 
-fn add_simple_token(ctx: *LexingContext, kind: TokenKind) {
+add_simple_token :: (ctx: *LexingContext, kind: TokenKind) {
   var null_sid: Sid;
   null_sid.x = 0;
   add_token(ctx, kind, null_sid);
 }
 
-fn add_lookahead_conditional_token(ctx: *LexingContext, expect: char, first: TokenKind, second: TokenKind) {
+add_lookahead_conditional_token :: (ctx: *LexingContext, expect: char, first: TokenKind, second: TokenKind) {
   var kind: TokenKind;
   if peek_token(ctx,0) == expect {
     advance(ctx);
@@ -75,11 +75,11 @@ fn add_lookahead_conditional_token(ctx: *LexingContext, expect: char, first: Tok
   add_token(ctx, kind, null_sid);
 }
 
-fn read_newline(ctx: *LexingContext) {
+read_newline :: (ctx: *LexingContext) {
   source_file_newline(ctx.source, ctx.start);
 }
 
-fn get_lexeme(ctx: *LexingContext, start_offset: u32, end_offset: u32) -> Sid {
+get_lexeme :: (ctx: *LexingContext, start_offset: u32, end_offset: u32) -> Sid {
   val str_len: u32 = ctx.current - (ctx.start + start_offset + end_offset);
   var source: *SourceFile = ctx.source;
   memcpy(ctx.lexeme_buffer, &source.content[ctx.start + start_offset], str_len);
@@ -90,11 +90,11 @@ fn get_lexeme(ctx: *LexingContext, start_offset: u32, end_offset: u32) -> Sid {
   return sid;
 }
 
-fn single_line_comment(ctx: *LexingContext) {
+single_line_comment :: (ctx: *LexingContext) {
   while (peek_token(ctx, 0) != '\n' && !is_done_lexing(ctx)) advance(ctx);
 }
 
-fn is_keyword(s: *char) -> TokenKind {
+is_keyword :: (s: *char) -> TokenKind {
   //TODO Replace this with a match
 
   if !strcmp(s, "break")  return TokenKind::Break;
@@ -122,7 +122,7 @@ fn is_keyword(s: *char) -> TokenKind {
   return TokenKind::Invalid;
 }
 
-fn lex_char(ctx: *LexingContext) {
+lex_char :: (ctx: *LexingContext) {
 
   var source: *SourceFile = ctx.source;
   val start_line: u32 = source.num_lines + 1;
@@ -143,7 +143,7 @@ fn lex_char(ctx: *LexingContext) {
   add_token(ctx, TokenKind::Char, get_lexeme(ctx, 1, 1));
 }
 
-fn lex_string(ctx: *LexingContext) {
+lex_string :: (ctx: *LexingContext) {
 
   var source: *SourceFile = ctx.source;
 
@@ -165,7 +165,7 @@ fn lex_string(ctx: *LexingContext) {
   add_token(ctx, TokenKind::String, get_lexeme(ctx, 1, 1));
 }
 
-fn lex_number(ctx: *LexingContext) {
+lex_number :: (ctx: *LexingContext) {
 
   while is_digit(peek_token(ctx,0))  advance(ctx);
   var dot_encountered: bool = false;
@@ -182,7 +182,7 @@ fn lex_number(ctx: *LexingContext) {
   add_token(ctx, t, get_lexeme(ctx, 0, 0));
 }
 
-fn lex_identifier(ctx: *LexingContext) {
+lex_identifier :: (ctx: *LexingContext) {
   while (is_alphanumeric(peek_token(ctx, 0)) || peek_token(ctx, 0) == '_') advance(ctx);
 
   val lexeme: Sid = get_lexeme(ctx, 0, 0);
@@ -194,7 +194,7 @@ fn lex_identifier(ctx: *LexingContext) {
   else  add_token(ctx, TokenKind::Identifier, lexeme);
 }
 
-fn scan_token(ctx: *LexingContext) {
+scan_token :: (ctx: *LexingContext) {
   val c: char = advance(ctx);
 
   //TODO Implement char literals such that we can replace the raw ASCII values here
@@ -255,7 +255,7 @@ fn scan_token(ctx: *LexingContext) {
   }
 }
 
-fn lex(sess: *Session, source: *SourceFile, num_tokens: *u32) -> *Token {
+lex :: (sess: *Session, source: *SourceFile, num_tokens: *u32) -> *Token {
 
   var ctx: *LexingContext = malloc(sizeof(LexingContext));
   ctx.source = source;

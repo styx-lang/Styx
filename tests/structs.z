@@ -1,11 +1,11 @@
 extern printf :: (format: *constchar, args: ...) -> i32
 
-struct A {
+A :: struct {
   x: u32,
   y: i32,
 }
 
-struct B {
+B :: struct {
   a: A,
   p: *A,
 }

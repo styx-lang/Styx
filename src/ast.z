@@ -4,17 +4,17 @@ use super::source_map::*;
 use super::interning::Sid;
 use super::error::*;
 
-struct AstType {}
-struct Expr {}
-struct Block {}
-struct Item {}
+AstType :: struct {}
+Expr :: struct {}
+Block :: struct {}
+Item :: struct {}
 
-struct Ident {
+Ident :: struct {
   name: Sid,
   span: Span,
 }
 
-enum IntegerSize {
+IntegerSize :: enum {
   I8,
   I16,
   I32,
@@ -23,7 +23,7 @@ enum IntegerSize {
   Int_Unspecified,
 }
 
-fn integer_size(size: IntegerSize) -> u32 {
+integer_size :: (size: IntegerSize) -> u32 {
   if size == IntegerSize::I8  return 8;
   else if size == IntegerSize::I16  return 16;
   else if size == IntegerSize::I32  return 32;
@@ -31,19 +31,19 @@ fn integer_size(size: IntegerSize) -> u32 {
   else abort();
 }
 
-enum FloatingSize {
+FloatingSize :: enum {
   F32,
   F64,
   Float_Unspecified,
 }
 
-fn floating_size(size: FloatingSize) -> u32 {
+floating_size :: (size: FloatingSize) -> u32 {
   if size == FloatingSize::F32  return 32;
   else if size == FloatingSize::F64  return 64;
   else abort();
 }
 
-enum PrimitiveTyKind {
+PrimitiveTyKind :: enum {
   Void,
   ConstVoid,
   Signed,
@@ -54,17 +54,17 @@ enum PrimitiveTyKind {
   ConstChar,
 }
 
-union PrimitiveTyNode {
+PrimitiveTyNode :: union {
   integer: IntegerSize,
   floating: FloatingSize,
 }
 
-struct PrimitiveTy {
+PrimitiveTy :: struct {
   node: PrimitiveTyNode,
   kind: PrimitiveTyKind,
 }
 
-enum BindingKind {
+BindingKind :: enum {
   Item,
   Variable,
   Parameter,
@@ -72,13 +72,13 @@ enum BindingKind {
   Variant,
 }
 
-struct Item {}
-struct EnumVariant {}
-struct FunctionParameter {}
-struct LetData {}
-struct PrimitiveTy {}
+Item :: struct {}
+EnumVariant :: struct {}
+FunctionParameter :: struct {}
+LetData :: struct {}
+PrimitiveTy :: struct {}
 
-union BindingNode {
+BindingNode :: union {
   item: *Item,
   variable: *LetData,
   parameter: *FunctionParameter,
@@ -86,44 +86,44 @@ union BindingNode {
   variant: *EnumVariant,
 }
 
-struct Binding {
+Binding :: struct {
   kind: BindingKind,
   node: BindingNode,
 }
 
-struct Path {
+Path :: struct {
   segments: *Ident,
   num_segments: u32,
   binding: Binding,
   span: Span,
 }
 
-struct Ty {};
+Ty :: struct {};
 
-struct FieldDef {
+FieldDef :: struct {
   name: Sid,
   ty: *Ty,
 }
 
-struct CompoundDef {
+CompoundDef :: struct {
   path: Path,
   fields: *FieldDef,
   num_fields: u32,
 }
 
-struct EnumDef {
+EnumDef :: struct {
   path: Path,
   variants: *Sid,
   num_variants: u32,
 }
 
-struct FnDef {
+FnDef :: struct {
   parameters: **Ty,
   num_parameters: u32,
   output: *Ty,
 }
 
-enum TyKind {
+TyKind :: enum {
   Void,
   ConstVoid,
   Variadic,
@@ -140,7 +140,7 @@ enum TyKind {
   Union,
 }
 
-union TyKindNode {
+TyKindNode :: union {
   integer: IntegerSize,
   floating: FloatingSize,
   ptr: *Ty,
@@ -149,23 +149,23 @@ union TyKindNode {
   function: FnDef,
 }
 
-struct Ty {
+Ty :: struct {
   kind: TyKind,
   node: TyKindNode,
 }
 
-struct Pattern {
+Pattern :: struct {
   ident: Ident,
   span: Span,
 }
 
-struct Item {}
+Item :: struct {}
 
-struct IndexEntry {
+IndexEntry :: struct {
   path: Path,
 }
 
-struct Module {
+Module :: struct {
   span: Span,
   items: **Item,
   num_items: u32,
@@ -176,35 +176,35 @@ struct Module {
   parent: *Module,
 }
 
-enum AstTypeKind {
+AstTypeKind :: enum {
   Void,
   Ptr,
   Path,
   Variadic,
 }
 
-struct GenericParam {
+GenericParam :: struct {
   ident: Ident,
 }
 
-struct Generics {
+Generics :: struct {
   parameters: *GenericParam,
   num_parameters: u32,
   span: Span,
 }
 
-union AstTypeKindNode {
+AstTypeKindNode :: union {
   path: Path,
   ptr: *AstType,
 }
 
-struct AstType {
+AstType :: struct {
   kind: AstTypeKind,
   node: AstTypeKindNode,
   ty: *Ty,
 }
 
-enum LiteralKind {
+LiteralKind :: enum {
   Int,
   Float,
   Bool,
@@ -212,7 +212,7 @@ enum LiteralKind {
   Str,
 }
 
-union LiteralValue {
+LiteralValue :: union {
   floating: f64,
   integer: u64,
   boolean: bool,
@@ -220,13 +220,13 @@ union LiteralValue {
   str: Sid,
 }
 
-struct Literal {
+Literal :: struct {
   kind: LiteralKind,
   value: LiteralValue,
 }
 
 
-enum UnaryOperatorKind {
+UnaryOperatorKind :: enum {
   // "*" operator for dereferencing pointers
   Deref,
   // "&" operator for taking the address of a place
@@ -237,7 +237,7 @@ enum UnaryOperatorKind {
   Complement,
 }
 
-enum BinaryOperatorKind {
+BinaryOperatorKind :: enum {
   Invalid, //Temporary until we get option types
   //Aritmetic operators
   Addition,
@@ -266,63 +266,63 @@ enum BinaryOperatorKind {
   Or,
 }
 
-struct BinaryData {
+BinaryData :: struct {
   op: BinaryOperatorKind,
   left: *Expr,
   right: *Expr,
 }
 
-struct CallData {
+CallData :: struct {
   func: *Expr,
   args: **Expr,
   num_args: u32,
 }
 
-struct CastData {
+CastData :: struct {
   inner: *Expr,
   ast_ty: *AstType,
   ty: *Ty,
 }
 
-struct ConditionalData {
+ConditionalData :: struct {
   condition: *Expr,
   then: *Expr,
   otherwise: *Expr,
 }
 
-struct WhileData {
+WhileData :: struct {
   condition: *Expr,
   body: *Expr,
 }
 
-struct IndexingData {
+IndexingData :: struct {
   array: *Expr,
   index: *Expr,
 }
 
-struct FieldData {
+FieldData :: struct {
   strct: *Expr,
   ident: Ident,
 }
 
-struct UnaryData {
+UnaryData :: struct {
   op: UnaryOperatorKind,
   inner: *Expr,
 }
 
-struct AssignmentData {
+AssignmentData :: struct {
   left: *Expr,
   right: *Expr,
 }
 
-struct LetData {
+LetData :: struct {
   pat: Pattern,
   value: *Expr,
   ast_ty: *AstType,
   ty: *Ty,
 }
 
-enum ExprKind {
+ExprKind :: enum {
   Binary,
   Block,
   Call,
@@ -343,7 +343,7 @@ enum ExprKind {
   Empty,
 }
 
-union ExprKindNode {
+ExprKindNode :: union {
   binary: BinaryData,
   block: *Block,
   call: CallData,
@@ -362,59 +362,59 @@ union ExprKindNode {
   _let: LetData,
 }
 
-struct Expr {
+Expr :: struct {
   span: Span,
   kind: ExprKind,
   node: ExprKindNode,
   ty: *Ty,
 }
 
-struct Block {
+Block :: struct {
   exprs: **Expr,
   num_exprs: u32,
   span: Span,
 }
 
-enum VisibilityKind {
+VisibilityKind :: enum {
   Public,
   Private,
 }
 
-struct Visibility {
+Visibility :: struct {
   kind: VisibilityKind,
 }
 
-struct CompoundField {
+CompoundField :: struct {
   ident: Ident,
   ast_ty: *AstType,
 }
 
-struct CompoundData {
+CompoundData :: struct {
   fields: *CompoundField,
   num_fields: u32,
   generics: Generics,
   ty: *Ty,
 }
 
-struct EnumVariant {
+EnumVariant :: struct {
   ident: Ident,
   _enum: *Item,
 }
 
-struct EnumData {
+EnumData :: struct {
   variants: *EnumVariant,
   num_variants: u32,
   ty: *Ty,
 }
 
-struct FunctionParameter {
+FunctionParameter :: struct {
   pat: Pattern,
   ast_ty: *AstType,
   ty: *Ty,
 }
 
 
-struct FunctionHeader {
+FunctionHeader :: struct {
   parameters: *FunctionParameter,
   num_parameters: u32,
   output_ast_ty: *AstType,
@@ -422,20 +422,20 @@ struct FunctionHeader {
   ty: *Ty,
 }
 
-struct FunctionData {
+FunctionData :: struct {
   header: FunctionHeader,
   body: *Expr,
 }
 
 
-struct VariableData {
+VariableData :: struct {
   ast_ty: *AstType,
   ty: *Ty,
   mutable: bool,
   body: *Expr,
 }
 
-union ItemKindNode {
+ItemKindNode :: union {
   compound: CompoundData,
   _enum: EnumData,
   variable: VariableData,
@@ -444,7 +444,7 @@ union ItemKindNode {
   _use: Path,
 }
 
-enum ItemKind {
+ItemKind :: enum {
   Const,
   Enum,
   Function,
@@ -455,7 +455,7 @@ enum ItemKind {
   Variable,
 }
 
-struct Item {
+Item :: struct {
   ident: Ident,
   kind: ItemKind,
   node: ItemKindNode,
@@ -464,21 +464,21 @@ struct Item {
   should_mangle: bool,
 }
 
-struct Ast {
+Ast :: struct {
   items: *Item,
   num_items: u32,
 
   root_module: *Module,
 }
 
-fn ast_create_expr(ast: *Ast, kind: ExprKind) -> *Expr {
+ast_create_expr :: (ast: *Ast, kind: ExprKind) -> *Expr {
   var expr: *Expr = malloc(sizeof(Expr));
   expr.kind = kind;
 
   return expr;
 }
 
-fn ast_create_item(ast: *Ast) -> *Item {
+ast_create_item :: (ast: *Ast) -> *Item {
 
   var item: *Item = &ast.items[ast.num_items];
   ast.num_items = ast.num_items + 1;

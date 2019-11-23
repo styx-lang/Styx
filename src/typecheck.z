@@ -5,7 +5,7 @@ use super::source_map::*;
 use super::ast::*;
 use super::error::*;
 
-struct CommonTypes {
+CommonTypes :: struct {
   _void: *Ty,
   _constvoid: *Ty,
   _variadic: *Ty,
@@ -24,7 +24,7 @@ struct CommonTypes {
   _f64: *Ty,
 }
 
-struct TypeContext {
+TypeContext :: struct {
   ast: *Ast,
   interner: *Interner,
   source_map: *SourceMap,
@@ -34,9 +34,9 @@ struct TypeContext {
   next_type_idx: u32,
 }
 
-fn hash_ty(ty: *Ty) -> u64;
+hash_ty :: (ty: *Ty) -> u64;
 
-fn hash_fn(ty: *Ty) -> u64 {
+hash_fn :: (ty: *Ty) -> u64 {
 
   var def: FnDef = ty.node.function;
   var h: u64 = hash_ty(def.output);
@@ -49,7 +49,7 @@ fn hash_fn(ty: *Ty) -> u64 {
   return h;
 }
 
-fn hash_path(path: Path) -> u64 {
+hash_path :: (path: Path) -> u64 {
   var h: u64 = path.num_segments;
   var i: u32 = 0;
   while i < path.num_segments {
@@ -59,7 +59,7 @@ fn hash_path(path: Path) -> u64 {
   return h;
 }
 
-fn hash_ty(ty: *Ty) -> u64 {
+hash_ty :: (ty: *Ty) -> u64 {
 
   var h: u64;
 
@@ -75,7 +75,7 @@ fn hash_ty(ty: *Ty) -> u64 {
   return h;
 }
 
-fn intern_ty(ctx: *TypeContext, ty: Ty) -> *Ty {
+intern_ty :: (ctx: *TypeContext, ty: Ty) -> *Ty {
   val h: u64 = hash_ty(&ty);
   var ty_idx: u32 = intmap_lookup(ctx.types_lookup, h);
   if ty_idx == 0 {
@@ -87,27 +87,27 @@ fn intern_ty(ctx: *TypeContext, ty: Ty) -> *Ty {
   return &ctx.types[ty_idx];
 }
 
-fn create_base_type(ctx: *TypeContext, kind: TyKind) -> *Ty {
+create_base_type :: (ctx: *TypeContext, kind: TyKind) -> *Ty {
   val ty: Ty;
   ty.kind = kind;
   return intern_ty(ctx, ty);
 }
 
-fn create_float_type(ctx: *TypeContext, size: FloatingSize) -> *Ty {
+create_float_type :: (ctx: *TypeContext, size: FloatingSize) -> *Ty {
   val ty: Ty;
   ty.kind = TyKind::Floating;
   ty.node.floating = size;
   return intern_ty(ctx, ty);
 }
 
-fn create_int_type(ctx: *TypeContext, kind: TyKind, size: IntegerSize) -> *Ty {
+create_int_type :: (ctx: *TypeContext, kind: TyKind, size: IntegerSize) -> *Ty {
   val ty: Ty;
   ty.kind = kind;
   ty.node.integer = size;
   return intern_ty(ctx, ty);
 }
 
-fn create_common_types(ctx: *TypeContext) {
+create_common_types :: (ctx: *TypeContext) {
   val t: *CommonTypes = &ctx.common;
   t._void = create_base_type(ctx, TyKind::Void);
   t._constvoid = create_base_type(ctx, TyKind::ConstVoid);
@@ -130,9 +130,9 @@ fn create_common_types(ctx: *TypeContext) {
   t._f64 = create_float_type(ctx, FloatingSize::F64);
 }
 
-fn ast_type_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty;
+ast_type_to_ty :: (ctx: *TypeContext, ast_ty: *AstType) -> *Ty;
 
-fn primitive_to_ty(ctx: *TypeContext, prim: PrimitiveTy) -> *Ty {
+primitive_to_ty :: (ctx: *TypeContext, prim: PrimitiveTy) -> *Ty {
   val t: *CommonTypes = &ctx.common;
   if prim.kind == PrimitiveTyKind::Void  return t._void;
   else if prim.kind == PrimitiveTyKind::Bool  return t._bool;
@@ -163,7 +163,7 @@ fn primitive_to_ty(ctx: *TypeContext, prim: PrimitiveTy) -> *Ty {
   else  abort();
 }
 
-fn ast_path_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
+ast_path_to_ty :: (ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
   val binding: Binding = ast_ty.node.path.binding;
 
   if binding.kind == BindingKind::PrimitiveType {
@@ -179,14 +179,14 @@ fn ast_path_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
   else abort(); //TODO
 }
 
-fn ast_ptr_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
+ast_ptr_to_ty :: (ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
   val ty: Ty;
   ty.kind = TyKind::Ptr;
   ty.node.ptr = ast_type_to_ty(ctx, ast_ty.node.ptr);
   return intern_ty(ctx, ty);
 }
 
-fn ast_type_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
+ast_type_to_ty :: (ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
   if ast_ty.kind == AstTypeKind::Void  return ctx.common._void;
   else if ast_ty.kind == AstTypeKind::Path  return ast_path_to_ty(ctx, ast_ty);
   else if ast_ty.kind == AstTypeKind::Ptr  return ast_ptr_to_ty(ctx, ast_ty);
@@ -194,7 +194,7 @@ fn ast_type_to_ty(ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
   else abort();
 }
 
-fn ast_literal_to_ty(ctx: *TypeContext, lit: Literal) -> *Ty {
+ast_literal_to_ty :: (ctx: *TypeContext, lit: Literal) -> *Ty {
   if lit.kind == LiteralKind::Int  return ctx.common._i32;
   else if lit.kind == LiteralKind::Float  return ctx.common._f32;
   else if lit.kind == LiteralKind::Bool  return ctx.common._bool;
@@ -208,7 +208,7 @@ fn ast_literal_to_ty(ctx: *TypeContext, lit: Literal) -> *Ty {
   else  abort();
 }
 
-fn coerce_type(ctx: *TypeContext, from: *Ty, to: *Ty) -> u32 {
+coerce_type :: (ctx: *TypeContext, from: *Ty, to: *Ty) -> u32 {
 
   if from == to  return 1;
   else if to.kind == TyKind::Variadic  return 1;
@@ -239,7 +239,7 @@ fn coerce_type(ctx: *TypeContext, from: *Ty, to: *Ty) -> u32 {
   return 0;
 }
 
-fn coerce_binary_expr(ctx: *TypeContext, expr: *Expr, left: *Ty, right: *Ty) {
+coerce_binary_expr :: (ctx: *TypeContext, expr: *Expr, left: *Ty, right: *Ty) {
 
   val coerce_left: u32 = coerce_type(ctx, left, right);
   val coerce_right: u32 = coerce_type(ctx, right, left);
@@ -260,7 +260,7 @@ fn coerce_binary_expr(ctx: *TypeContext, expr: *Expr, left: *Ty, right: *Ty) {
   else  emit_error(ctx.source_map, expr.span, "Cannot coerce type in binary expression");
 }
 
-fn coerce_expr_type(ctx: *TypeContext, expr: *Expr, from: *Ty, to: *Ty) -> *Expr {
+coerce_expr_type :: (ctx: *TypeContext, expr: *Expr, from: *Ty, to: *Ty) -> *Expr {
   val can_coerce: u32 = coerce_type(ctx, from, to);
   if can_coerce == 1  return expr;
   else if can_coerce == 2 {
@@ -273,11 +273,11 @@ fn coerce_expr_type(ctx: *TypeContext, expr: *Expr, from: *Ty, to: *Ty) -> *Expr
   abort();
 }
 
-fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty;
-fn check_item(ctx: *TypeContext, item: *Item);
-fn check_mod(ctx: *TypeContext, module: *Module);
+check_expr :: (ctx: *TypeContext, expr: *Expr) -> *Ty;
+check_item :: (ctx: *TypeContext, item: *Item);
+check_mod :: (ctx: *TypeContext, module: *Module);
 
-fn check_unary(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_unary :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   var inner_ty: *Ty = check_expr(ctx, expr.node.unary.inner);
   val op: UnaryOperatorKind = expr.node.unary.op;
   if op == UnaryOperatorKind::Deref {
@@ -302,13 +302,13 @@ fn check_unary(ctx: *TypeContext, expr: *Expr) -> *Ty {
   abort();
 }
 
-fn operator_is_boolean(op: BinaryOperatorKind) -> bool {
+operator_is_boolean :: (op: BinaryOperatorKind) -> bool {
   return op == BinaryOperatorKind::Less || op == BinaryOperatorKind::LessEq || op == BinaryOperatorKind::NotEq ||
     op == BinaryOperatorKind::Greater || op == BinaryOperatorKind::GreaterEq || op == BinaryOperatorKind::Equality ||
     op == BinaryOperatorKind::And || op == BinaryOperatorKind::Or;
 }
 
-fn check_binary(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_binary :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   val op: BinaryOperatorKind = expr.node.binary.op;
   var left: *Ty = check_expr(ctx, expr.node.binary.left);
   var right: *Ty = check_expr(ctx, expr.node.binary.right);
@@ -319,7 +319,7 @@ fn check_binary(ctx: *TypeContext, expr: *Expr) -> *Ty {
   else  return left;
 }
 
-fn check_block(ctx: *TypeContext, block: *Block) {
+check_block :: (ctx: *TypeContext, block: *Block) {
   var i: u32 = 0;
   while i < block.num_exprs {
     check_expr(ctx, block.exprs[i]);
@@ -327,12 +327,12 @@ fn check_block(ctx: *TypeContext, block: *Block) {
   }
 }
 
-fn check_block_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_block_expr :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   check_block(ctx, expr.node.block);
   return ctx.common._void;
 }
 
-fn check_call(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_call :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   var call: CallData = expr.node.call;
   val fn_ty: *Ty = check_expr(ctx, call.func);
   if fn_ty.kind != TyKind::Fn  emit_warning(ctx.source_map, expr.span, "Tried to call non-function");
@@ -359,7 +359,7 @@ fn check_call(ctx: *TypeContext, expr: *Expr) -> *Ty {
   return fn_def.output;
 }
 
-fn check_conditional(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_conditional :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   var data: *ConditionalData = &expr.node.conditional;
 
   val cond_ty: *Ty = check_expr(ctx, data.condition);
@@ -372,7 +372,7 @@ fn check_conditional(ctx: *TypeContext, expr: *Expr) -> *Ty {
   return ctx.common._void;
 }
 
-fn check_while(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_while :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   var data: WhileData = expr.node.whl;
   var condition: *Expr = data.condition;
   val cond_ty: *Ty = check_expr(ctx, condition);
@@ -381,7 +381,7 @@ fn check_while(ctx: *TypeContext, expr: *Expr) -> *Ty {
   return ctx.common._void;
 }
 
-fn check_indexing(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_indexing :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   val data: IndexingData = expr.node.indexing;
   val array_ty: *Ty = check_expr(ctx, data.array);
   if array_ty.kind != TyKind::Ptr   emit_error(ctx.source_map, expr.span, "Cannot index into non-ptr type");
@@ -392,7 +392,7 @@ fn check_indexing(ctx: *TypeContext, expr: *Expr) -> *Ty {
   return array_ty.node.ptr;
 }
 
-fn check_field(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_field :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   val data: FieldData = expr.node.field;
   var compound_ty: *Ty = check_expr(ctx, data.strct);
 
@@ -416,7 +416,7 @@ fn check_field(ctx: *TypeContext, expr: *Expr) -> *Ty {
   return null;
 }
 
-fn check_path(ctx: *TypeContext, path: *Path) -> *Ty {
+check_path :: (ctx: *TypeContext, path: *Path) -> *Ty {
   if path.binding.kind == BindingKind::Item {
     val item: *Item = path.binding.node.item;
     if item.kind == ItemKind::Struct || item.kind == ItemKind::Union {
@@ -453,35 +453,35 @@ fn check_path(ctx: *TypeContext, path: *Path) -> *Ty {
 }
 
 
-fn check_let(ctx: *TypeContext, data: *LetData) -> *Ty {
+check_let :: (ctx: *TypeContext, data: *LetData) -> *Ty {
   data.ty = ast_type_to_ty(ctx, data.ast_ty);
   if data.value  check_expr(ctx, data.value);
   return ctx.common._void;
 }
 
-fn check_assignment(ctx: *TypeContext, assignment: AssignmentData) -> *Ty {
+check_assignment :: (ctx: *TypeContext, assignment: AssignmentData) -> *Ty {
   check_expr(ctx, assignment.left);
   check_expr(ctx, assignment.right);
   return ctx.common._void;
 }
 
-fn check_return(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_return :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   check_expr(ctx, expr);
   return ctx.common._void;
 }
 
-fn check_sizeof(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_sizeof :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   check_expr(ctx, expr);
   return ctx.common._u64;
 }
 
-fn check_cast(ctx: *TypeContext, data: *CastData) -> *Ty {
+check_cast :: (ctx: *TypeContext, data: *CastData) -> *Ty {
   check_expr(ctx, data.inner);
   data.ty = ast_type_to_ty(ctx, data.ast_ty);
   return data.ty;
 }
 
-fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_expr :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   val result: *Ty;
   if expr.kind == ExprKind::Unary  result = check_unary(ctx, expr);
   else if expr.kind == ExprKind::Binary  result = check_binary(ctx, expr);
@@ -505,7 +505,7 @@ fn check_expr(ctx: *TypeContext, expr: *Expr) -> *Ty {
 }
 
 
-fn check_variable(ctx: *TypeContext, item: *Item) {
+check_variable :: (ctx: *TypeContext, item: *Item) {
   var data: *VariableData = &item.node.variable;
   var decl_ty: *Ty = data.ty;
 
@@ -516,14 +516,14 @@ fn check_variable(ctx: *TypeContext, item: *Item) {
   }
 }
 
-fn check_function(ctx: *TypeContext, item: *Item) {
+check_function :: (ctx: *TypeContext, item: *Item) {
 
   if item.node.function.body {
     check_expr(ctx, item.node.function.body);
   }
 }
 
-fn check_item(ctx: *TypeContext, item: *Item) {
+check_item :: (ctx: *TypeContext, item: *Item) {
   if item.kind == ItemKind::Enum  {}
   else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  {}
   else if item.kind == ItemKind::Use  {}
@@ -533,7 +533,7 @@ fn check_item(ctx: *TypeContext, item: *Item) {
   else abort();
 }
 
-fn check_mod(ctx: *TypeContext, module: *Module) {
+check_mod :: (ctx: *TypeContext, module: *Module) {
   var i: u32 = 0;
   while i < module.num_items {
     check_item(ctx, module.items[i]);
@@ -541,7 +541,7 @@ fn check_mod(ctx: *TypeContext, module: *Module) {
   }
 }
 
-fn collect_enum(ctx: *TypeContext, item: *Item, path: Path) {
+collect_enum :: (ctx: *TypeContext, item: *Item, path: Path) {
 
   val ty: *Ty = item.node._enum.ty;
   val def: *EnumDef = &ty.node._enum;
@@ -555,12 +555,12 @@ fn collect_enum(ctx: *TypeContext, item: *Item, path: Path) {
   def.num_variants = item.node._enum.num_variants;
 }
 
-fn collect_variable(ctx: *TypeContext, item: *Item) {
+collect_variable :: (ctx: *TypeContext, item: *Item) {
   var data: *VariableData = &item.node.variable;
   data.ty = ast_type_to_ty(ctx, data.ast_ty);
 }
 
-fn collect_function(ctx: *TypeContext, item: *Item) {
+collect_function :: (ctx: *TypeContext, item: *Item) {
 
   val header: *FunctionHeader = &item.node.function.header;
 
@@ -585,7 +585,7 @@ fn collect_function(ctx: *TypeContext, item: *Item) {
   item.node.function.header.ty = intern_ty(ctx, ty);
 }
 
-fn collect_compound(ctx: *TypeContext, item: *Item, path: Path) {
+collect_compound :: (ctx: *TypeContext, item: *Item, path: Path) {
   val ty: *Ty = item.node.compound.ty;
   val def: *CompoundDef = &ty.node.compound;
 
@@ -603,9 +603,9 @@ fn collect_compound(ctx: *TypeContext, item: *Item, path: Path) {
 
 }
 
-fn collect_mod(ctx: *TypeContext, module: *Module);
+collect_mod :: (ctx: *TypeContext, module: *Module);
 
-fn collect_item(ctx: *TypeContext, item: *Item, path: Path) {
+collect_item :: (ctx: *TypeContext, item: *Item, path: Path) {
   if item.kind == ItemKind::Enum  collect_enum(ctx, item, path);
   else if item.kind == ItemKind::Function  collect_function(ctx, item);
   else if item.kind == ItemKind::Variable || item.kind == ItemKind::Const  collect_variable(ctx, item);
@@ -613,7 +613,7 @@ fn collect_item(ctx: *TypeContext, item: *Item, path: Path) {
   else if item.kind == ItemKind::Module  collect_mod(ctx, item.node.module);
 }
 
-fn collect_mod(ctx: *TypeContext, module: *Module) {
+collect_mod :: (ctx: *TypeContext, module: *Module) {
   var i: u32 = 0;
   while i < module.num_items {
     var item: *Item = module.items[i];
@@ -623,7 +623,7 @@ fn collect_mod(ctx: *TypeContext, module: *Module) {
   }
 }
 
-fn collect_names(ctx: *TypeContext, module: *Module) {
+collect_names :: (ctx: *TypeContext, module: *Module) {
   var i: u32 = 0;
   while i < module.num_items {
     var item: *Item = module.items[i];
@@ -666,7 +666,7 @@ fn collect_names(ctx: *TypeContext, module: *Module) {
   }
 }
 
-fn check(sess: *Session, ast: *Ast) {
+check :: (sess: *Session, ast: *Ast) {
   var ctx: TypeContext;
 
   ctx.ast = ast;

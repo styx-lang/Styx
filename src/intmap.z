@@ -1,14 +1,14 @@
 
 use super::cstd::*;
 
-struct IntMap {
+IntMap :: struct {
   keys: *u64,
   values: *u64,
   size: u64,
   load: u64,
 }
 
-fn intmap_create(size: u64) -> *IntMap {
+intmap_create :: (size: u64) -> *IntMap {
   var map: *IntMap = malloc(sizeof(IntMap));
 
   map.size = size;
@@ -26,18 +26,18 @@ fn intmap_create(size: u64) -> *IntMap {
   return map;
 }
 
-fn intmap_hash(k: u64) -> u64 {
+intmap_hash :: (k: u64) -> u64 {
   if k != 0  return k;
   else return 1;
 }
 
-fn intmap_reset(map: *IntMap) {
+intmap_reset :: (map: *IntMap) {
   map.load = 0;
   memset(map.keys, 0, sizeof(map.size) * 8);
   memset(map.values, 0, sizeof(map.size) * 8);
 }
 
-fn intmap_insert(map: *IntMap, key: u64, value: u64) {
+intmap_insert :: (map: *IntMap, key: u64, value: u64) {
   val h: u64 = intmap_hash(key) % map.size;
   if map.load + 1 >= map.size {
     printf("Hashmap of size %lu is full!\n", map.size);
@@ -58,7 +58,7 @@ fn intmap_insert(map: *IntMap, key: u64, value: u64) {
   }
 }
 
-fn intmap_lookup(map: *IntMap, key: u64) -> u64 {
+intmap_lookup :: (map: *IntMap, key: u64) -> u64 {
   var h: u64 = intmap_hash(key) % map.size;
   while (true) {
     if map.keys[h] == 0  return 0;
@@ -69,7 +69,7 @@ fn intmap_lookup(map: *IntMap, key: u64) -> u64 {
   }
 }
 
-fn intmap_destroy(map: *IntMap) {
+intmap_destroy :: (map: *IntMap) {
   free(map.keys);
   free(map.values);
   free(map);

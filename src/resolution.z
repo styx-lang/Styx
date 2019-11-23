@@ -5,43 +5,43 @@ use super::source_map::*;
 use super::error::*;
 use super::ast::*;
 
-enum VariableInfoKind {
+VariableInfoKind :: enum {
   Variable,
   Parameter,
 }
 
-union VariableInfoNode {
+VariableInfoNode :: union {
   variable: *LetData,
   parameter: *FunctionParameter,
 }
 
-struct VariableInfo {
+VariableInfo :: struct {
   ident: Ident,
   kind: VariableInfoKind,
   node: VariableInfoNode,
 }
 
-struct VariableBlock {
+VariableBlock :: struct {
   variables: *VariableInfo,
   num_variables: u32,
 }
 
-enum ScopeKind {
+ScopeKind :: enum {
   VariableBlock,
   Module,
 }
 
-union ScopeNode {
+ScopeNode :: union {
   module: *Module,
   variable: VariableBlock,
 }
 
-struct Scope {
+Scope :: struct {
   kind: ScopeKind,
   node: ScopeNode,
 }
 
-struct PrimitiveTypeSids {
+PrimitiveTypeSids :: struct {
   _void: Sid,
   _constvoid: Sid,
   _bool: Sid,
@@ -59,7 +59,7 @@ struct PrimitiveTypeSids {
   _f64: Sid,
 }
 
-fn setup_primitive_ty_sids(i: *Interner, p: *PrimitiveTypeSids) {
+setup_primitive_ty_sids :: (i: *Interner, p: *PrimitiveTypeSids) {
   p._void = intern(i, "void");
   p._constvoid = intern(i, "constvoid");
   p._bool = intern(i, "bool");
@@ -77,7 +77,7 @@ fn setup_primitive_ty_sids(i: *Interner, p: *PrimitiveTypeSids) {
   p._f64 = intern(i, "f64");
 }
 
-struct ResolutionContext {
+ResolutionContext :: struct {
   scope_stack: *Scope,
   stack_top: u32,
   ast: *Ast,
@@ -87,7 +87,7 @@ struct ResolutionContext {
   primitive_ty_sids: PrimitiveTypeSids,
 }
 
-fn push_block(ctx: *ResolutionContext) {
+push_block :: (ctx: *ResolutionContext) {
   ctx.stack_top = ctx.stack_top + 1;
   var scope: *Scope = &ctx.scope_stack[ctx.stack_top];
 
@@ -96,13 +96,13 @@ fn push_block(ctx: *ResolutionContext) {
   scope.node.variable.num_variables = 0;
 }
 
-fn pop_block(ctx: *ResolutionContext) {
+pop_block :: (ctx: *ResolutionContext) {
   var scope: *Scope = &ctx.scope_stack[ctx.stack_top];
   free(scope.node.variable.variables);
   ctx.stack_top = ctx.stack_top - 1;
 }
 
-fn push_parameter(ctx: *ResolutionContext, ident: Ident, data: *FunctionParameter) {
+push_parameter :: (ctx: *ResolutionContext, ident: Ident, data: *FunctionParameter) {
   var scope: *Scope = &ctx.scope_stack[ctx.stack_top];
   if scope.kind != ScopeKind::VariableBlock  abort();
   var v: *VariableBlock = &scope.node.variable;
@@ -112,7 +112,7 @@ fn push_parameter(ctx: *ResolutionContext, ident: Ident, data: *FunctionParamete
   v.num_variables = v.num_variables + 1;
 }
 
-fn push_variable(ctx: *ResolutionContext, ident: Ident, data: *LetData) {
+push_variable :: (ctx: *ResolutionContext, ident: Ident, data: *LetData) {
   var scope: *Scope = &ctx.scope_stack[ctx.stack_top];
   if scope.kind != ScopeKind::VariableBlock  abort();
   var v: *VariableBlock = &scope.node.variable;
@@ -122,7 +122,7 @@ fn push_variable(ctx: *ResolutionContext, ident: Ident, data: *LetData) {
   v.num_variables = v.num_variables + 1;
 }
 
-fn push_module(ctx: *ResolutionContext, module: *Module) {
+push_module :: (ctx: *ResolutionContext, module: *Module) {
   ctx.stack_top = ctx.stack_top + 1;
   var scope: *Scope = &ctx.scope_stack[ctx.stack_top];
 
@@ -130,13 +130,13 @@ fn push_module(ctx: *ResolutionContext, module: *Module) {
   scope.node.module = module;
 }
 
-fn pop_module(ctx: *ResolutionContext) {
+pop_module :: (ctx: *ResolutionContext) {
   ctx.stack_top = ctx.stack_top - 1;
 }
 
 
 
-fn lookup(ctx: *ResolutionContext, ident: Ident) -> Path {
+lookup :: (ctx: *ResolutionContext, ident: Ident) -> Path {
   var i: i32 = ctx.stack_top;
   while i > 0 {
     var scope: *Scope = &ctx.scope_stack[i];
@@ -177,7 +177,7 @@ fn lookup(ctx: *ResolutionContext, ident: Ident) -> Path {
   abort();
 }
 
-fn index_use_binding(ctx: *ResolutionContext, path: Path) -> Binding {
+index_use_binding :: (ctx: *ResolutionContext, path: Path) -> Binding {
   var cur_mod: *Module = ctx.root_module;
   var i: u32 = 0;
   while true {
@@ -208,7 +208,7 @@ fn index_use_binding(ctx: *ResolutionContext, path: Path) -> Binding {
   }
 }
 
-fn absolute_use(ctx: *ResolutionContext, module: *Module, item: *Item) {
+absolute_use :: (ctx: *ResolutionContext, module: *Module, item: *Item) {
   var p: *Path = &item.node._use;
   var abs: Path;
   if p.segments[0].name.x == intern(ctx.interner, "self").x {
@@ -228,7 +228,7 @@ fn absolute_use(ctx: *ResolutionContext, module: *Module, item: *Item) {
   }
 }
 
-fn index_use(ctx: *ResolutionContext, module: *Module) {
+index_use :: (ctx: *ResolutionContext, module: *Module) {
   var i: u32 = 0;
   while i < module.num_items {
     var item: *Item = module.items[i];
@@ -246,7 +246,7 @@ fn index_use(ctx: *ResolutionContext, module: *Module) {
   }
 }
 
-fn add_item(ctx: *ResolutionContext, module: *Module, parent: *Module, item: *Item) {
+add_item :: (ctx: *ResolutionContext, module: *Module, parent: *Module, item: *Item) {
 
   var idx_entry: *IndexEntry = &module.index[module.num_indices];
 
@@ -264,7 +264,7 @@ fn add_item(ctx: *ResolutionContext, module: *Module, parent: *Module, item: *It
 }
 
 
-fn add_absolute_item(ctx: *ResolutionContext, module: *Module, path: Path, item: *Item) {
+add_absolute_item :: (ctx: *ResolutionContext, module: *Module, path: Path, item: *Item) {
 
   var idx_entry: *IndexEntry = &module.index[module.num_indices];
 
@@ -276,7 +276,7 @@ fn add_absolute_item(ctx: *ResolutionContext, module: *Module, path: Path, item:
   module.num_indices = module.num_indices + 1;
 }
 
-fn index_module(ctx: *ResolutionContext, module: *Module) {
+index_module :: (ctx: *ResolutionContext, module: *Module) {
   var i: u32 = 0;
   while i < module.num_items {
     var item: *Item = module.items[i];
@@ -301,7 +301,7 @@ fn index_module(ctx: *ResolutionContext, module: *Module) {
   }
 }
 
-fn index_module_wildcards(ctx: *ResolutionContext, module: *Module) {
+index_module_wildcards :: (ctx: *ResolutionContext, module: *Module) {
   var i: u32 = 0;
   while i < module.num_items {
     var item: *Item = module.items[i];
@@ -333,7 +333,7 @@ fn index_module_wildcards(ctx: *ResolutionContext, module: *Module) {
   }
 }
 
-fn check_if_sid_is_primitive(ctx: *ResolutionContext, s: Sid, prim: *PrimitiveTy) -> bool {
+check_if_sid_is_primitive :: (ctx: *ResolutionContext, s: Sid, prim: *PrimitiveTy) -> bool {
 
   val p: *PrimitiveTypeSids = &ctx.primitive_ty_sids;
   if s.x == p._void.x  prim.kind = PrimitiveTyKind::Void;
@@ -360,7 +360,7 @@ fn check_if_sid_is_primitive(ctx: *ResolutionContext, s: Sid, prim: *PrimitiveTy
   return true;
 }
 
-fn resolve_path(ctx: *ResolutionContext, path: *Path) {
+resolve_path :: (ctx: *ResolutionContext, path: *Path) {
   var prim: PrimitiveTy;
 
   if check_if_sid_is_primitive(ctx, path.segments[0].name, &prim) {
@@ -406,7 +406,7 @@ fn resolve_path(ctx: *ResolutionContext, path: *Path) {
   }
 }
 
-fn resolve_type(ctx: *ResolutionContext, ty: *AstType) {
+resolve_type :: (ctx: *ResolutionContext, ty: *AstType) {
   if ty.kind == AstTypeKind::Ptr {
     resolve_type(ctx, ty.node.ptr);
   }
@@ -415,19 +415,19 @@ fn resolve_type(ctx: *ResolutionContext, ty: *AstType) {
   }
 }
 
-fn resolve_expr(ctx: *ResolutionContext, expr: *Expr)
-fn resolve_item(ctx: *ResolutionContext, item: *Item)
+resolve_expr :: (ctx: *ResolutionContext, expr: *Expr)
+resolve_item :: (ctx: *ResolutionContext, item: *Item)
 
-fn resolve_unary(ctx: *ResolutionContext, unary: UnaryData) {
+resolve_unary :: (ctx: *ResolutionContext, unary: UnaryData) {
   resolve_expr(ctx, unary.inner);
 }
 
-fn resolve_binary(ctx: *ResolutionContext, binary: BinaryData) {
+resolve_binary :: (ctx: *ResolutionContext, binary: BinaryData) {
   resolve_expr(ctx, binary.left);
   resolve_expr(ctx, binary.right);
 }
 
-fn resolve_call(ctx: *ResolutionContext, call: CallData) {
+resolve_call :: (ctx: *ResolutionContext, call: CallData) {
   resolve_expr(ctx, call.func);
 
   var i: u32 = 0;
@@ -437,7 +437,7 @@ fn resolve_call(ctx: *ResolutionContext, call: CallData) {
   }
 }
 
-fn resolve_conditional(ctx: *ResolutionContext, cond: ConditionalData) {
+resolve_conditional :: (ctx: *ResolutionContext, cond: ConditionalData) {
   resolve_expr(ctx, cond.condition);
   resolve_expr(ctx, cond.then);
   if (cond.otherwise) {
@@ -445,26 +445,26 @@ fn resolve_conditional(ctx: *ResolutionContext, cond: ConditionalData) {
   }
 }
 
-fn resolve_while(ctx: *ResolutionContext, data: WhileData) {
+resolve_while :: (ctx: *ResolutionContext, data: WhileData) {
   resolve_expr(ctx, data.condition);
   resolve_expr(ctx, data.body);
 }
 
-fn resolve_indexing(ctx: *ResolutionContext, idx: IndexingData) {
+resolve_indexing :: (ctx: *ResolutionContext, idx: IndexingData) {
   resolve_expr(ctx, idx.array);
   resolve_expr(ctx, idx.index);
 }
 
-fn resolve_field(ctx: *ResolutionContext, field: FieldData) {
+resolve_field :: (ctx: *ResolutionContext, field: FieldData) {
   resolve_expr(ctx, field.strct);
 }
 
-fn resolve_assignment(ctx: *ResolutionContext, assignment: AssignmentData) {
+resolve_assignment :: (ctx: *ResolutionContext, assignment: AssignmentData) {
   resolve_expr(ctx, assignment.left);
   resolve_expr(ctx, assignment.right);
 }
 
-fn resolve_block(ctx: *ResolutionContext, block: *Block) {
+resolve_block :: (ctx: *ResolutionContext, block: *Block) {
 
   push_block(ctx);
   var i: u32 = 0;
@@ -475,22 +475,22 @@ fn resolve_block(ctx: *ResolutionContext, block: *Block) {
   pop_block(ctx);
 }
 
-fn resolve_let(ctx: *ResolutionContext, data: *LetData) {
+resolve_let :: (ctx: *ResolutionContext, data: *LetData) {
   push_variable(ctx, data.pat.ident, data);
   resolve_type(ctx, data.ast_ty);
   if data.value  resolve_expr(ctx, data.value);
 }
 
-fn resolve_sizeof(ctx: *ResolutionContext, expr: *Expr) {
+resolve_sizeof :: (ctx: *ResolutionContext, expr: *Expr) {
   resolve_expr(ctx, expr);
 }
 
-fn resolve_cast(ctx: *ResolutionContext, data: *CastData) {
+resolve_cast :: (ctx: *ResolutionContext, data: *CastData) {
   resolve_expr(ctx, data.inner);
   resolve_type(ctx, data.ast_ty);
 }
 
-fn resolve_expr(ctx: *ResolutionContext, expr: *Expr) {
+resolve_expr :: (ctx: *ResolutionContext, expr: *Expr) {
   if expr.kind == ExprKind::Unary  resolve_unary(ctx, expr.node.unary);
   else if expr.kind == ExprKind::Binary  resolve_binary(ctx, expr.node.binary);
   else if expr.kind == ExprKind::Block  resolve_block(ctx, expr.node.block);
@@ -510,7 +510,7 @@ fn resolve_expr(ctx: *ResolutionContext, expr: *Expr) {
   else abort();
 }
 
-fn resolve_function(ctx: *ResolutionContext, item: *Item) {
+resolve_function :: (ctx: *ResolutionContext, item: *Item) {
   var func: FunctionData = item.node.function;
 
   resolve_type(ctx, func.header.output_ast_ty);
@@ -536,7 +536,7 @@ fn resolve_function(ctx: *ResolutionContext, item: *Item) {
   }
 }
 
-fn resolve_variable(ctx: *ResolutionContext, item: *Item) {
+resolve_variable :: (ctx: *ResolutionContext, item: *Item) {
   resolve_type(ctx, item.node.variable.ast_ty);
   push_block(ctx);
   if item.node.variable.body {
@@ -545,7 +545,7 @@ fn resolve_variable(ctx: *ResolutionContext, item: *Item) {
   pop_block(ctx);
 }
 
-fn resolve_compound(ctx: *ResolutionContext, item: *Item) {
+resolve_compound :: (ctx: *ResolutionContext, item: *Item) {
 
   var data: CompoundData = item.node.compound;
 
@@ -556,16 +556,16 @@ fn resolve_compound(ctx: *ResolutionContext, item: *Item) {
   }
 }
 
-fn resolve_module(ctx: *ResolutionContext, module: *Module);
+resolve_module :: (ctx: *ResolutionContext, module: *Module);
 
-fn resolve_item(ctx: *ResolutionContext, item: *Item) {
+resolve_item :: (ctx: *ResolutionContext, item: *Item) {
   if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  resolve_variable(ctx, item);
   if item.kind == ItemKind::Function  resolve_function(ctx, item);
   if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  resolve_compound(ctx, item);
   if item.kind == ItemKind::Module  resolve_module(ctx, item.node.module);
 }
 
-fn resolve_module(ctx: *ResolutionContext, module: *Module) {
+resolve_module :: (ctx: *ResolutionContext, module: *Module) {
   push_module(ctx, module);
 
   var i: u32 = 0;
@@ -576,7 +576,7 @@ fn resolve_module(ctx: *ResolutionContext, module: *Module) {
   pop_module(ctx);
 }
 
-fn resolve(sess: *Session, ast: *Ast) {
+resolve :: (sess: *Session, ast: *Ast) {
   var ctx: ResolutionContext;
 
   ctx.interner = &sess.interner;
