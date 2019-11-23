@@ -1,5 +1,5 @@
-Lang
+Styx
     filter remove_inline //.*$
     filter call_regexp_common C++
-    extension z
+    extension stx
     3rd_gen_scale 1.00

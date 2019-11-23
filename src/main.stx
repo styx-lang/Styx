@@ -58,7 +58,7 @@ add_module :: (sess: *Session, target: *CompileTarget, path: Path, parent: *Modu
 
 main :: (argc: i32, argv: **char) -> i32 {
   if argc != 3 {
-    printf("Usage: compiler INPUT OUTPUT\n");
+    printf("Usage: styxc INPUT OUTPUT\n");
     abort();
   }
 
