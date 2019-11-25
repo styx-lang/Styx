@@ -40,17 +40,11 @@ load_file_content :: (file: *SourceFile) {
   fclose(fp);
 }
 
-source_map_new_file :: (map: *SourceMap, path: *char, filename: *char) -> *SourceFile {
+source_map_new_file :: (map: *SourceMap, filename: *char) -> *SourceFile {
   file: *SourceFile = &map.files[map.num_files];
   map.num_files = map.num_files + 1;
 
-  needed_length: u32 = strlen(path) + strlen(filename) + 4;
-
-  name_buffer: *char = malloc(needed_length);
-
-  sprintf(name_buffer, "%s/%s.z", path, filename);
-
-  file.name = name_buffer;
+  file.name = filename;
   file.lines = calloc(sizeof(u32), 4096);
   file.num_lines = 1;
 

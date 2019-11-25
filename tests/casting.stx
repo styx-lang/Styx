@@ -1,4 +1,4 @@
-extern printf :: (format: *constchar, args: ...) -> i32
+import cstdio;
 
 main :: () {
   a: f32 = 4.2;

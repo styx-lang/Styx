@@ -1,20 +1,3 @@
-
-extern malloc :: (size: u64) -> *void
-extern calloc :: (size: u64, count: u64) -> *void
-extern free :: (ptr: *void)
-
-extern memset :: (dest: *void, ch: i32, size: u64) -> *void
-extern memcpy :: (dest: *void, src: *constvoid, size: u64) -> *void
-extern strcmp :: (lhs: *constchar, rhs: *constchar) -> i32
-extern strlen :: (str: *constchar) -> u64
-extern strtok :: (str: *char, delim: *constchar) -> *char
-
-extern atof :: (str: *constchar) -> f64
-extern atol :: (str: *constchar) -> i64
-
-extern abort :: ();
-extern exit :: (status: i32);
-
 FILE :: struct {}
 
 extern fopen :: (filename: *constchar, mode: *constchar) -> *FILE
@@ -35,7 +18,4 @@ extern printf :: (format: *constchar, args: ...) -> i32
 extern fprintf :: (stream: *FILE, format: *constchar, args: ...) -> i32
 extern sprintf :: (buffer: *char, format: *constchar, args: ...) -> i32
 
-extern access :: (pathname: *constchar, mode: i32) -> i32;
-
-null :: *void = 0
 EOF :: i32 = -1

@@ -1,4 +1,4 @@
-extern printf :: (format: *constchar, args: ...) -> i32
+import cstdio;
 
 import module_b;
 import module_c;

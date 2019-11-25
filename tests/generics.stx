@@ -1,4 +1,4 @@
-extern printf :: (format: *constchar, args: ...) -> i32
+import cstdio;
 
 f<T> :: (T: t) -> T {
   return t;

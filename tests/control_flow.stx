@@ -1,4 +1,4 @@
-extern printf :: (format: *constchar, args: ...) -> i32
+import cstdio;
 
 main :: () {
   a: u32 = 1;

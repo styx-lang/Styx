@@ -8,4 +8,6 @@ Session :: struct {
   interner: Interner,
   source: SourceMap,
   root_path: *char,
+  search_paths: **char,
+  num_search_paths: u32,
 }
