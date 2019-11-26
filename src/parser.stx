@@ -101,6 +101,8 @@ parse_path :: (ctx: *ParsingContext) -> Path {
     if !accept(ctx, TokenKind::ColonColon)  break;
   }
 
+  try_parse_generics(ctx, &path.generics);
+
   path.span.to = span_end(ctx);
   return path;
 }
@@ -544,19 +546,38 @@ parse_stmt :: (ctx: *ParsingContext) -> *Expr {
   return stmt;
 }
 
-parse_generics :: (ctx: *ParsingContext) -> Generics {
-  expect(ctx, TokenKind::Less);
-  generics: Generics;
-  generics.parameters = malloc(4 * sizeof(GenericParam));
+try_parse_generics :: (ctx: *ParsingContext, generics: *Generics) -> bool {
+  i: u32 = 0;
   generics.num_parameters = 0;
 
-  while !accept(ctx, TokenKind::Greater) {
-    generics.parameters[generics.num_parameters].ident = parse_identifier(ctx);
+  if look_ahead(ctx, i).kind !=  TokenKind::Less  return false;
+  i = i+1;
+  generics.parameters = malloc(4 * sizeof(GenericParam));
 
-    accept(ctx, TokenKind::Comma);
+  while look_ahead(ctx, i).kind != TokenKind::Greater {
+    tok: Token = look_ahead(ctx, i);
+
+    if tok.kind != TokenKind::Identifier  return false;
+
+    //TODO Set Span for this ident (or even better add machinery for backtracking)
+    generics.parameters[generics.num_parameters].ident.name = tok.lexeme;
     generics.num_parameters = generics.num_parameters + 1;
+
+    i = i + 1;
+
+    if tok.kind == TokenKind::Comma  i = i + 1;
   }
-  return generics;
+  i = i + 1;
+
+  ctx.current_token = ctx.current_token + i;
+  return true;
+}
+
+parse_generics :: (ctx: *ParsingContext) -> Generics {
+  generics: Generics;
+  if try_parse_generics(ctx, &generics)  return generics;
+  else emit_error(ctx.source_map, generics.span, "Failed to parse generics");
+  abort();
 }
 
 parse_variable_decl :: (ctx: *ParsingContext, item: *Item) {

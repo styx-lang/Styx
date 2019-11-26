@@ -1,0 +1,16 @@
+import cstdio;
+
+A :: struct<T> {
+  x: T,
+  y: T,
+  z: bool,
+}
+
+main :: () {
+  a: A<u32>;
+  //a.x = 12;
+  //a.y = 42;
+  //a.z = a.y > a.x;
+
+  printf("%u %u %u\n", a.x, a.y, a.z);
+}

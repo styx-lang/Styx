@@ -9,11 +9,13 @@ import session;
 SymbolInfoKind :: enum {
   Local,
   Parameter,
+  Generic,
 }
 
 SymbolInfoNode :: union {
   local: *LocalData,
   parameter: *FunctionParameter,
+  generic: *GenericParam,
 }
 
 SymbolInfo :: struct {
@@ -102,6 +104,16 @@ push_parameter :: (ctx: *ResolutionContext, ident: Ident, data: *FunctionParamet
   scope.num_symbols = scope.num_symbols + 1;
 }
 
+
+push_generic :: (ctx: *ResolutionContext, ident: Ident, data: *GenericParam) {
+  scope: *Scope = &ctx.scope_stack[ctx.stack_top];
+  s: *SymbolInfo = &scope.symbols[scope.num_symbols];
+  s.ident = ident;
+  s.kind = SymbolInfoKind::Generic;
+  s.node.generic = data;
+  scope.num_symbols = scope.num_symbols + 1;
+}
+
 push_local :: (ctx: *ResolutionContext, ident: Ident, data: *LocalData) {
   scope: *Scope = &ctx.scope_stack[ctx.stack_top];
   s: *SymbolInfo = &scope.symbols[scope.num_symbols];
@@ -131,6 +143,11 @@ lookup :: (ctx: *ResolutionContext, ident: Ident) -> Path {
             path.binding.kind = BindingKind::Parameter;
             path.binding.node.parameter = symbol.node.parameter;
           }
+          else if symbol.kind == SymbolInfoKind::Generic {
+            path.binding.kind = BindingKind::Generic;
+            path.binding.node.generic = symbol.node.generic;
+          }
+          else  abort();
           return path;
       }
       j = j - 1;
@@ -406,11 +423,22 @@ resolve_compound :: (ctx: *ResolutionContext, item: *Item) {
 
   data: CompoundData = item.node.compound;
 
+  push_block(ctx);
+
   i: u32 = 0;
+  while i < data.generics.num_parameters {
+    generic: *GenericParam = &data.generics.parameters[i];
+    push_generic(ctx, generic.ident, generic);
+    i = i + 1;
+  }
+
+  i = 0;
   while i <  data.num_fields {
     resolve_type(ctx, data.fields[i].ast_ty);
     i = i + 1;
   }
+
+  pop_block(ctx);
 }
 
 resolve_item :: (ctx: *ResolutionContext, item: *Item) {

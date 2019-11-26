@@ -70,6 +70,7 @@ BindingKind :: enum {
   Local,
   Module,
   Parameter,
+  Generic,
   PrimitiveType,
   Variant,
 }
@@ -77,6 +78,7 @@ BindingKind :: enum {
 Item :: struct {}
 EnumVariant :: struct {}
 FunctionParameter :: struct {}
+GenericParam :: struct {}
 LocalData :: struct {}
 PrimitiveTy :: struct {}
 
@@ -85,6 +87,7 @@ BindingNode :: union {
   local: *LocalData,
   parameter: *FunctionParameter,
   primitive: PrimitiveTy,
+  generic: *GenericParam,
   variant: *EnumVariant,
   module: *Module,
 }
@@ -94,11 +97,22 @@ Binding :: struct {
   node: BindingNode,
 }
 
+GenericParam :: struct {
+  ident: Ident,
+}
+
+Generics :: struct {
+  parameters: *GenericParam,
+  num_parameters: u32,
+  span: Span,
+}
+
 Path :: struct {
   segments: *Ident,
   num_segments: u32,
   binding: Binding,
   span: Span,
+  generics: Generics,
 }
 
 Ty :: struct {};
@@ -177,16 +191,6 @@ AstTypeKind :: enum {
   Ptr,
   Path,
   Variadic,
-}
-
-GenericParam :: struct {
-  ident: Ident,
-}
-
-Generics :: struct {
-  parameters: *GenericParam,
-  num_parameters: u32,
-  span: Span,
 }
 
 AstTypeKindNode :: union {
