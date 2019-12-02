@@ -12,6 +12,8 @@ extern strtok :: (str: *char, delim: *constchar) -> *char
 extern atof :: (str: *constchar) -> f64
 extern atol :: (str: *constchar) -> i64
 
+extern strtoul :: (str: *constchar, end: *char, base: i32) -> u64
+
 extern abort :: ();
 extern exit :: (status: i32);
 

@@ -420,7 +420,7 @@ check_field :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
     }
     i = i + 1;
   }
-  emit_warning(ctx.source_map, expr.span, "Compound type has no such field");
+  emit_error(ctx.source_map, expr.span, "Compound type has no such field");
   return null;
 }
 

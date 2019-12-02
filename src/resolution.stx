@@ -85,7 +85,7 @@ push_block :: (ctx: *ResolutionContext) {
   ctx.stack_top = ctx.stack_top + 1;
   scope: *Scope = &ctx.scope_stack[ctx.stack_top];
 
-  scope.symbols = malloc(8*32);
+  scope.symbols = malloc(sizeof(SymbolInfo)*32);
   scope.num_symbols = 0;
 }
 

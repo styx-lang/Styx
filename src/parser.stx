@@ -215,7 +215,25 @@ parse_integer_literal :: (ctx: *ParsingContext) -> *Expr {
   expr.node.lit.kind = LiteralKind::Int;
 
   sess: *Session = ctx.sess;
-  expr.node.lit.value.integer = atol(get_str(&sess.interner, tok.lexeme));
+
+  lit_str: *char = get_str(&sess.interner, tok.lexeme);
+
+  base: u32 = 10;
+
+  //Check for non-decimal base prefix
+  if strlen(lit_str) > 2 && lit_str[0] == '0' {
+    n: char = lit_str[1];
+    if n == 'b' || n == 'B'  base = 2;
+    if n == 'o' || n == 'O'  base = 8;
+    if n == 'x' || n == 'X'  base = 16;
+  }
+
+  //Skip base prefix
+  if base != 10  lit_str = &lit_str[2];
+
+  //TODO Check correctness of input str
+
+  expr.node.lit.value.integer = strtoul(lit_str, null, base);
   return expr;
 }
 

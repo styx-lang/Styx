@@ -1,0 +1,13 @@
+import cstdio;
+
+main :: () -> i32 {
+  a: u32 = 12;
+  b: u32 = 42;
+  c: u32 = 0b01111011;
+  d: u32 = 0B11011;
+  e: u32 = 0o600;
+  f: u32 = 0O333;
+  g: u32 = 0xCaFeBabe;
+  h: u32 = 0XDEADBEEF;
+  printf("%u %u %u %u %u %u %u %u\n", a, b, c, d, e, f, g, h);
+}
