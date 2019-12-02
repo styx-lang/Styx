@@ -1,0 +1,30 @@
+
+//Memory
+extern malloc :: (size: u64) -> *void;
+extern calloc :: (size: u64, count: u64) -> *void;
+extern realloc :: (ptr: *void, new_size: u64) -> *void;
+extern free :: (ptr: *void);
+
+//Program support utilities
+
+extern abort :: ();
+extern exit :: (status: i32);
+
+extern system :: (command: *constchar) -> i32;
+extern getenv :: (name: *constchar) -> *char;
+
+//Strings conversions
+
+extern atof :: (str: *constchar) -> f64;
+extern atoi :: (str: *constchar) -> u64;
+extern atol :: (str: *constchar) -> i64;
+
+extern strtol :: (str: *constchar, str_end: **char, base: i32) -> i64;
+extern strtoul :: (str: *constchar, str_end: **char, base: i32) -> u64;
+extern strtouf :: (str: *constchar, str_end: **char) -> f32;
+extern strtoud :: (str: *constchar, str_end: **char) -> f64;
+
+//Random numbers
+
+extern rand :: () -> i32;
+extern srand :: (seed: u32);

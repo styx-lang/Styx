@@ -1,0 +1,5 @@
+extern memset :: (dest: *void, ch: i32, size: u64) -> *void
+extern memcpy :: (dest: *void, src: *constvoid, size: u64) -> *void
+extern strcmp :: (lhs: *constchar, rhs: *constchar) -> i32
+extern strlen :: (str: *constchar) -> u64
+extern strtok :: (str: *char, delim: *constchar) -> *char

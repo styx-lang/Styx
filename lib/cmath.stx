@@ -1,0 +1,8 @@
+
+extern sqrtf :: (x: f32) -> f32;
+extern sqrt :: (x: f64) -> f64;
+
+extern expf :: (x: f32) -> f32;
+extern exp :: (x: f64) -> f64;
+
+FLT_MAX: f32 = 34028234700000000000000000000000000000.0;
