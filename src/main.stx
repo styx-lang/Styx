@@ -58,6 +58,7 @@ search_module :: (sess: *Session, module_path: Path) -> *char {
   while i < sess.num_search_paths {
     sprintf(path, "%s/%s.stx", sess.search_paths[i], module_part);
     if !access(path, 0)  return path;
+    i = i + 1;
   }
 
   abort();

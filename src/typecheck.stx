@@ -178,6 +178,12 @@ ast_path_to_ty :: (ctx: *TypeContext, ast_ty: *AstType) -> *Ty {
     else if item.kind == ItemKind::Enum  return item.node._enum.ty;
     else  return null;
   }
+  else if binding.kind == BindingKind::Generic {
+    generic: Ty;
+    generic.kind = TyKind::Generic;
+    generic.node.generic = binding.node.generic;
+    return intern_ty(ctx, generic);
+  }
   else abort(); //TODO
 }
 

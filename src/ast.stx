@@ -155,6 +155,7 @@ TyKind :: enum {
   Enum,
   Struct,
   Union,
+  Generic,
 }
 
 TyKindNode :: union {
@@ -164,6 +165,7 @@ TyKindNode :: union {
   compound: CompoundDef,
   _enum: EnumDef,
   function: FnDef,
+  generic: *GenericParam,
 }
 
 Ty :: struct {
