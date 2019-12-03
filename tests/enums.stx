@@ -1,0 +1,17 @@
+import cstdio;
+
+UnitEnum :: enum {
+  A,
+  B,
+  C,
+}
+
+
+main :: () -> i32 {
+
+  a: UnitEnum = UnitEnum::A;
+  b: UnitEnum = UnitEnum::B;
+  printf("%u %u %u %u\n", a == a, a == b, b == UnitEnum::B, a == UnitEnum::C);
+
+  return 0;
+}
