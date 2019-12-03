@@ -80,7 +80,6 @@ EnumVariant :: struct {}
 FunctionParameter :: struct {}
 GenericParam :: struct {}
 LocalData :: struct {}
-PrimitiveTy :: struct {}
 
 BindingNode :: union {
   item: *Item,
@@ -117,23 +116,6 @@ Path :: struct {
 
 Ty :: struct {};
 
-FieldDef :: struct {
-  name: Sid,
-  ty: *Ty,
-}
-
-CompoundDef :: struct {
-  path: Path,
-  fields: *FieldDef,
-  num_fields: u32,
-}
-
-EnumDef :: struct {
-  path: Path,
-  variants: *Sid,
-  num_variants: u32,
-}
-
 FnDef :: struct {
   parameters: **Ty,
   num_parameters: u32,
@@ -158,12 +140,15 @@ TyKind :: enum {
   Generic,
 }
 
+EnumData :: struct {}
+CompoundData :: struct {}
+
 TyKindNode :: union {
   integer: IntegerSize,
   floating: FloatingSize,
   ptr: *Ty,
-  compound: CompoundDef,
-  _enum: EnumDef,
+  compound: *CompoundData,
+  _enum: *EnumData,
   function: FnDef,
   generic: *GenericParam,
 }
@@ -389,6 +374,7 @@ Visibility :: struct {
 CompoundField :: struct {
   ident: Ident,
   ast_ty: *AstType,
+  ty: *Ty,
 }
 
 CompoundData :: struct {
@@ -396,17 +382,38 @@ CompoundData :: struct {
   num_fields: u32,
   generics: Generics,
   ty: *Ty,
+  path: Path,
 }
+
+TupleElement :: struct {
+  ast_ty: *AstType,
+  ty: *Ty,
+  position: u32,
+}
+
+VariantKind :: enum {
+  Unit,
+  Tuple,
+}
+
+VariantData :: struct {
+  elements: *TupleElement,
+  num_elements: u32,
+}
+
 
 EnumVariant :: struct {
   ident: Ident,
   _enum: *Item,
+  data: VariantData,
+  kind: VariantKind,
 }
 
 EnumData :: struct {
   variants: *EnumVariant,
   num_variants: u32,
   ty: *Ty,
+  path: Path,
 }
 
 FunctionParameter :: struct {

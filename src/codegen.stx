@@ -175,7 +175,10 @@ generate_binary :: (ctx: *CodegenContext, binary: BinaryData) {
 }
 
 generate_call :: (ctx: *CodegenContext, call: CallData) {
-  generate_expr(ctx, call.func);
+  if call.func.ty.kind == TyKind::Enum {
+    generate_expr(ctx, call.func);
+    fprintf(ctx.out, "_create");
+  } else  generate_expr(ctx, call.func);
 
   fprintf(ctx.out, "(");
   i: u32 = 0;
@@ -384,6 +387,17 @@ generate_enum :: (ctx: *CodegenContext, item: *Item) {
   fprintf(ctx.out, "}");
   mangle_path_and_ident(ctx, module.path, item.ident);
   fprintf(ctx.out, ";\n\n");
+
+  i = 0;
+  while i < data.num_variants {
+    variant_name: *char = get_str(ctx.interner, data.variants[i].ident.name);
+    mangle_path_and_ident(ctx, module.path, item.ident);
+    fprintf(ctx.out, " %s_%s_create(", enum_name, variant_name);
+
+    fprintf(ctx.out, " ) {\n");
+    fprintf(ctx.out, "return %s_%s;\n}\n", enum_name, variant_name);
+    i = i + 1;
+  }
 }
 
 generate_compound :: (ctx: *CodegenContext, item: *Item) {
@@ -397,7 +411,7 @@ generate_compound :: (ctx: *CodegenContext, item: *Item) {
   module: *Module = ctx.current_module;
 
   compound_ty: *Ty = data.ty;
-  def: *CompoundDef = &compound_ty.node.compound;
+  compound: *CompoundData = compound_ty.node.compound;
 
   emit_line_directive(ctx.out, ctx.source, item.span);
   if data.num_fields > 0 {
@@ -406,7 +420,7 @@ generate_compound :: (ctx: *CodegenContext, item: *Item) {
     fprintf(ctx.out, " {\n");
     i: u32 = 0;
     while i < data.num_fields {
-      generate_ty(ctx, def.fields[i].ty);
+      generate_ty(ctx, compound.fields[i].ty);
 
       field_name: *char = get_str(ctx.interner, data.fields[i].ident.name);
       fprintf(ctx.out, " %s;\n", field_name);

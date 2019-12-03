@@ -655,8 +655,24 @@ parse_enum_decl :: (ctx: *ParsingContext, item: *Item) {
   item.node._enum.num_variants = 0;
 
   while !accept(ctx, TokenKind::RightCurly) {
-    item.node._enum.variants[item.node._enum.num_variants].ident = parse_identifier(ctx);
-    item.node._enum.variants[item.node._enum.num_variants]._enum = item;
+    variant: *EnumVariant = &item.node._enum.variants[item.node._enum.num_variants];
+    variant.ident = parse_identifier(ctx);
+    variant._enum = item;
+
+    if accept(ctx, TokenKind::LeftParen) {
+      variant.kind = VariantKind::Tuple;
+      variant.data.elements = malloc(sizeof(EnumData) * 4);
+      i: u32 = 0;
+      while !accept(ctx, TokenKind::RightParen) {
+        variant.data.elements[i].ast_ty = parse_type(ctx);
+        variant.data.elements[i].position = i;
+        i = i + 1;
+        accept(ctx, TokenKind::Comma);
+      }
+      variant.data.num_elements = i;
+    }
+    else  variant.kind = VariantKind::Unit;
+
     item.node._enum.num_variants = item.node._enum.num_variants + 1;
     expect(ctx, TokenKind::Comma);
   }

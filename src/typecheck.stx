@@ -84,8 +84,8 @@ intern_ty :: (ctx: *TypeContext, ty: Ty) -> *Ty {
     ty_idx = ctx.next_type_idx;
     ctx.next_type_idx = ctx.next_type_idx + 1;
     intmap_insert(ctx.types_lookup, h, ty_idx);
-    ctx.types[ty_idx] = ty;
   }
+  ctx.types[ty_idx] = ty;
   return &ctx.types[ty_idx];
 }
 
@@ -340,11 +340,8 @@ check_block_expr :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   return ctx.common._void;
 }
 
-check_call :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
+check_fn_call :: (ctx: *TypeContext, expr: *Expr, fn_ty: *Ty) -> *Ty {
   call: CallData = expr.node.call;
-  fn_ty: *Ty = check_expr(ctx, call.func);
-  if fn_ty.kind != TyKind::Fn  emit_warning(ctx.source_map, expr.span, "Tried to call non-function");
-
   fn_def: *FnDef = &fn_ty.node.function;
 
   is_variadic: bool = false;
@@ -367,6 +364,36 @@ check_call :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   return fn_def.output;
 }
 
+
+check_enum_constructor :: (ctx: *TypeContext, expr: *Expr, enum_ty: *Ty) -> *Ty {
+  call: CallData = expr.node.call;
+
+  variant: *EnumVariant = call.func.node.path.binding.node.variant;
+
+  if variant.kind == VariantKind::Unit  emit_error(ctx.source_map, expr.span, "Called enum constructor on unit variant");
+
+  if call.num_args == variant.data.num_elements {
+    i: i32 = 0;
+    while i < call.num_args {
+        arg_ty: *Ty = check_expr(ctx, call.args[i]);
+        call.args[i] = coerce_expr_type(ctx, call.args[i], arg_ty, variant.data.elements[i].ty);
+        i = i + 1;
+    }
+  }
+  else  emit_error(ctx.source_map, expr.span, "Called enum constructor with incorrect number of arguments");
+
+  return enum_ty;
+}
+
+check_call :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
+  call: CallData = expr.node.call;
+  receiver_ty: *Ty = check_expr(ctx, call.func);
+  if receiver_ty.kind == TyKind::Fn  return check_fn_call(ctx, expr, receiver_ty);
+  else if call.func.kind == ExprKind::Path && receiver_ty.kind == TyKind::Enum  return check_enum_constructor(ctx, expr, receiver_ty);
+  else  emit_error(ctx.source_map, expr.span, "Tried to call a non-callable type");
+  abort();
+}
+
 check_conditional :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   data: *ConditionalData = &expr.node.conditional;
 
@@ -384,7 +411,7 @@ check_while :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   data: WhileData = expr.node.whl;
   condition: *Expr = data.condition;
   cond_ty: *Ty = check_expr(ctx, condition);
-  if cond_ty.kind != TyKind::Bool  emit_warning(ctx.source_map, condition.span, "Condition must be of type bool");
+  if cond_ty.kind != TyKind::Bool  emit_error(ctx.source_map, condition.span, "Condition must be of type bool");
   check_expr(ctx, data.body);
   return ctx.common._void;
 }
@@ -411,11 +438,11 @@ check_field :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
 
   if compound_ty.kind != TyKind::Struct && compound_ty.kind != TyKind::Union   emit_error(ctx.source_map, expr.span, "Cannot access field of non-compound type");
 
-  compound: CompoundDef = compound_ty.node.compound;
+  compound: *CompoundData = compound_ty.node.compound;
 
   i: u32 = 0;
   while i < compound.num_fields {
-    if compound.fields[i].name.x == data.ident.name.x {
+    if compound.fields[i].ident.name.x == data.ident.name.x {
       return compound.fields[i].ty;
     }
     i = i + 1;
@@ -551,15 +578,22 @@ check_mod :: (ctx: *TypeContext, module: *Module) {
 collect_enum :: (ctx: *TypeContext, item: *Item) {
 
   ty: *Ty = item.node._enum.ty;
-  def: *EnumDef = &ty.node._enum;
+  def: *EnumData = ty.node._enum;
 
-  def.variants = malloc(sizeof(Sid) * item.node._enum.num_variants);
   i: u32 = 0;
   while i < item.node._enum.num_variants {
-    def.variants[i] = item.node._enum.variants[i].ident.name;
+    variant: *EnumVariant = &def.variants[i];
+
+    if variant.kind == VariantKind::Tuple {
+      j: u32 = 0;
+      while j < variant.data.num_elements {
+        elem: *TupleElement = &variant.data.elements[j];
+        elem.ty = ast_type_to_ty(ctx, elem.ast_ty);
+        j = j + 1;
+      }
+    }
     i = i + 1;
   }
-  def.num_variants = item.node._enum.num_variants;
 }
 
 collect_variable :: (ctx: *TypeContext, item: *Item) {
@@ -593,19 +627,12 @@ collect_function :: (ctx: *TypeContext, item: *Item) {
 }
 
 collect_compound :: (ctx: *TypeContext, item: *Item) {
-  ty: *Ty = item.node.compound.ty;
-  def: *CompoundDef = &ty.node.compound;
+  compound: *CompoundData = &item.node.compound;
 
-  if item.node.compound.num_fields > 0 {
-
-    def.fields = malloc(sizeof(FieldDef) * item.node.compound.num_fields);
-    i: u32 = 0;
-    while i < item.node.compound.num_fields {
-      def.fields[i].name = item.node.compound.fields[i].ident.name;
-      def.fields[i].ty = ast_type_to_ty(ctx, item.node.compound.fields[i].ast_ty);
-      i = i + 1;
-    }
-    def.num_fields = item.node.compound.num_fields;
+  i: u32 = 0;
+  while i < compound.num_fields {
+    compound.fields[i].ty = ast_type_to_ty(ctx, compound.fields[i].ast_ty);
+    i = i + 1;
   }
 
 }
@@ -630,36 +657,19 @@ collect_names :: (ctx: *TypeContext, module: *Module) {
   while i < module.num_items {
     item: *Item = &module.items[i];
     if item.kind == ItemKind::Struct || item.kind == ItemKind::Union {
-      def: CompoundDef;
-      def.path.num_segments = module.path.num_segments + 1;
-      def.path.segments = malloc(sizeof(Ident) * def.path.num_segments);
-      def.path.binding.kind = BindingKind::Item;
-      def.path.binding.node.item = item;
-      memcpy(def.path.segments, module.path.segments, sizeof(Ident) * module.path.num_segments);
-      def.path.segments[module.path.num_segments] = item.ident;
-
       ty: Ty;
       if item.kind == ItemKind::Struct  ty.kind = TyKind::Struct;
       else if item.kind == ItemKind::Union  ty.kind = TyKind::Union;
 
-      ty.node.compound = def;
+      ty.node.compound = &item.node.compound;
 
       item.node.compound.ty = intern_ty(ctx, ty);
     }
     else if item.kind == ItemKind::Enum {
-
-      def: EnumDef;
-      def.path.num_segments = module.path.num_segments + 1;
-      def.path.segments = malloc(sizeof(Ident) * def.path.num_segments);
-      def.path.binding.kind = BindingKind::Item;
-      def.path.binding.node.item = item;
-      memcpy(def.path.segments, module.path.segments, sizeof(Ident) * module.path.num_segments);
-      def.path.segments[module.path.num_segments] = item.ident;
-
       ty: Ty;
       ty.kind = TyKind::Enum;
 
-      ty.node._enum = def;
+      ty.node._enum = &item.node._enum;
 
       item.node._enum.ty = intern_ty(ctx, ty);
     }

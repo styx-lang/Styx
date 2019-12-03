@@ -6,12 +6,38 @@ UnitEnum :: enum {
   C,
 }
 
+CustomVariant :: struct {
+  x: u32,
+  y: u32,
+}
+
+TupleEnum :: enum {
+  A(i32),
+  B(u32),
+  C(i32, i32),
+  D(bool, bool),
+  E(CustomVariant),
+  F(CustomVariant, bool),
+}
 
 main :: () -> i32 {
 
-  a: UnitEnum = UnitEnum::A;
-  b: UnitEnum = UnitEnum::B;
-  printf("%u %u %u %u\n", a == a, a == b, b == UnitEnum::B, a == UnitEnum::C);
+  u_a: UnitEnum = UnitEnum::A;
+  u_b: UnitEnum = UnitEnum::B;
+  printf("%u %u %u %u\n", u_a == u_a, u_a == u_b, u_b == UnitEnum::B, u_a == UnitEnum::C);
+
+  t_a: TupleEnum = TupleEnum::A(12);
+  t_b: TupleEnum = TupleEnum::B(12);
+  t_c1: TupleEnum = TupleEnum::C(12, 42);
+  t_c2: TupleEnum = TupleEnum::C(12, 42);
+  t_d: TupleEnum = TupleEnum::D(t_c1 == t_c2, t_a == t_b);
+
+  custom1: CustomVariant;
+  custom1.x = 1;
+  custom1.y = 2;
+
+  t_e: TupleEnum = TupleEnum::E(custom1);
+  t_f: TupleEnum = TupleEnum::F(custom1, false);
 
   return 0;
 }

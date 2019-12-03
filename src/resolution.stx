@@ -290,7 +290,6 @@ resolve_type :: (ctx: *ResolutionContext, ty: *AstType) {
 }
 
 resolve_expr :: (ctx: *ResolutionContext, expr: *Expr)
-resolve_item :: (ctx: *ResolutionContext, item: *Item)
 
 resolve_unary :: (ctx: *ResolutionContext, unary: UnaryData) {
   resolve_expr(ctx, unary.inner);
@@ -419,9 +418,44 @@ resolve_variable :: (ctx: *ResolutionContext, item: *Item) {
   pop_block(ctx);
 }
 
-resolve_compound :: (ctx: *ResolutionContext, item: *Item) {
 
-  data: CompoundData = item.node.compound;
+resolve_enum :: (ctx: *ResolutionContext, item: *Item, parent_path: Path) {
+
+  data: *EnumData = &item.node._enum;
+
+  data.path.num_segments = parent_path.num_segments + 1;
+  data.path.segments = malloc(sizeof(Ident) * data.path.num_segments);
+  data.path.binding.kind = BindingKind::Item;
+  data.path.binding.node.item = item;
+  memcpy(data.path.segments, parent_path.segments, sizeof(Ident) * parent_path.num_segments);
+  data.path.segments[parent_path.num_segments] = item.ident;
+
+
+  i: u32 = 0;
+  while i < data.num_variants {
+    variant: *EnumVariant = &data.variants[i];
+
+    if variant.kind == VariantKind::Tuple {
+      j: u32 = 0;
+      while j < variant.data.num_elements {
+        resolve_type(ctx, variant.data.elements[j].ast_ty);
+        j = j + 1;
+      }
+    }
+    i = i + 1;
+  }
+}
+
+resolve_compound :: (ctx: *ResolutionContext, item: *Item, parent_path: Path) {
+
+  data: *CompoundData = &item.node.compound;
+
+  data.path.num_segments = parent_path.num_segments + 1;
+  data.path.segments = malloc(sizeof(Ident) * data.path.num_segments);
+  data.path.binding.kind = BindingKind::Item;
+  data.path.binding.node.item = item;
+  memcpy(data.path.segments, parent_path.segments, sizeof(Ident) * parent_path.num_segments);
+  data.path.segments[parent_path.num_segments] = item.ident;
 
   push_block(ctx);
 
@@ -441,17 +475,18 @@ resolve_compound :: (ctx: *ResolutionContext, item: *Item) {
   pop_block(ctx);
 }
 
-resolve_item :: (ctx: *ResolutionContext, item: *Item) {
+resolve_item :: (ctx: *ResolutionContext, item: *Item, parent_path: Path) {
   if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  resolve_variable(ctx, item);
   if item.kind == ItemKind::Function  resolve_function(ctx, item);
-  if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  resolve_compound(ctx, item);
+  if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  resolve_compound(ctx, item, parent_path);
+  if item.kind == ItemKind::Enum  resolve_enum(ctx, item, parent_path);
 }
 
 resolve_module :: (ctx: *ResolutionContext, module: *Module) {
 
   i: u32 = 0;
   while i < module.num_items {
-    resolve_item(ctx, &module.items[i]);
+    resolve_item(ctx, &module.items[i], module.path);
     i = i + 1;
   }
 }
