@@ -65,7 +65,7 @@ hash_ty :: (ty: *Ty) -> u64 {
 
   h: u64;
 
-  h = ty.kind;
+  h = cast(&ty.kind, *u32)[0]; //Hack to access tag from enum
 
   if ty.kind == TyKind::Signed || ty.kind == TyKind::Unsigned  h = h ^ (integer_size(ty.node.integer) << 4);
   else if ty.kind == TyKind::Floating  h = h ^ (floating_size(ty.node.floating) << 4);
@@ -257,12 +257,14 @@ coerce_binary_expr :: (ctx: *TypeContext, expr: *Expr, left: *Ty, right: *Ty) {
     cast_expr: *Expr = create_expr(ExprKind::Cast);
     cast_expr.node._cast.ty = right;
     cast_expr.node._cast.inner = expr.node.binary.left;
+    cast_expr.ty = cast_expr.node._cast.ty;
     expr.node.binary.left = cast_expr;
   }
   else if coerce_right == 2 {
     cast_expr: *Expr = create_expr(ExprKind::Cast);
     cast_expr.node._cast.ty = left;
     cast_expr.node._cast.inner = expr.node.binary.right;
+    cast_expr.ty = cast_expr.node._cast.ty;
     expr.node.binary.right = cast_expr;
   }
   else  emit_error(ctx.source_map, expr.span, "Cannot coerce type in binary expression");
@@ -275,6 +277,7 @@ coerce_expr_type :: (ctx: *TypeContext, expr: *Expr, from: *Ty, to: *Ty) -> *Exp
     cast_expr: *Expr = create_expr(ExprKind::Cast);
     cast_expr.node._cast.ty = to;
     cast_expr.node._cast.inner = expr;
+    cast_expr.ty = cast_expr.node._cast.ty;
     return cast_expr;
   }
   else emit_error(ctx.source_map, expr.span, "Cannot coerce type");

@@ -43,7 +43,7 @@ can_accept :: (ctx: *ParsingContext, token: TokenKind) -> bool {
 look_ahead :: (ctx: *ParsingContext, offset: u64) -> Token {
   if ctx.current_token == ctx.num_tokens {
     eof_tok: Token;
-    eof_tok.kind = EOF;
+    eof_tok.kind = TokenKind::EOF;
     return eof_tok;
   } else  return ctx.tokens[ctx.current_token + offset];
 }
@@ -658,6 +658,7 @@ parse_enum_decl :: (ctx: *ParsingContext, item: *Item) {
     variant: *EnumVariant = &item.node._enum.variants[item.node._enum.num_variants];
     variant.ident = parse_identifier(ctx);
     variant._enum = item;
+    variant.data.num_elements = 0;
 
     if accept(ctx, TokenKind::LeftParen) {
       variant.kind = VariantKind::Tuple;

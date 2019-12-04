@@ -65,7 +65,7 @@ mangle_path :: (ctx: *CodegenContext, path: Path) {
     }
     fprintf(ctx.out, "E");
   } else if path.binding.kind == BindingKind::Variant {
-    fprintf(ctx.out, "%s_%s", get_str(ctx.interner, path.segments[path.num_segments-2].name), get_str(ctx.interner, path.segments[path.num_segments-1].name));
+    fprintf(ctx.out, "%s_%s_create()", get_str(ctx.interner, path.segments[path.num_segments-2].name), get_str(ctx.interner, path.segments[path.num_segments-1].name));
   }
   else {
     fprintf(ctx.out, "%s", get_str(ctx.interner, path.segments[path.num_segments-1].name));
@@ -148,6 +148,9 @@ generate_unary :: (ctx: *CodegenContext, unary: UnaryData) {
 generate_binary :: (ctx: *CodegenContext, binary: BinaryData) {
   fprintf(ctx.out, "(");
   generate_expr(ctx, binary.left);
+
+  if binary.left.ty.kind == TyKind::Enum  fprintf(ctx.out, ".kind ");
+
   if binary.op == BinaryOperatorKind::Addition  fprintf(ctx.out, "+ ");
   else if binary.op == BinaryOperatorKind::Subtraction  fprintf(ctx.out, "- ");
   else if binary.op == BinaryOperatorKind::Product  fprintf(ctx.out, "* ");
@@ -171,13 +174,16 @@ generate_binary :: (ctx: *CodegenContext, binary: BinaryData) {
   else if binary.op == BinaryOperatorKind::Or  fprintf(ctx.out, "|| ");
   else abort();
   generate_expr(ctx, binary.right);
+  if binary.left.ty.kind == TyKind::Enum  fprintf(ctx.out, ".kind ");
   fprintf(ctx.out, ")");
 }
 
 generate_call :: (ctx: *CodegenContext, call: CallData) {
   if call.func.ty.kind == TyKind::Enum {
+    //Horrible hack to erase parens from mangle_path.
+    //Requires a better codegen backend to implement properly.
     generate_expr(ctx, call.func);
-    fprintf(ctx.out, "_create");
+    fseek(ctx.out, -2, SEEK_CUR);
   } else  generate_expr(ctx, call.func);
 
   fprintf(ctx.out, "(");
@@ -366,18 +372,17 @@ generate_function :: (ctx: *CodegenContext, item: *Item) {
   else  fprintf(ctx.out, ";\n");
 }
 
-generate_enum :: (ctx: *CodegenContext, item: *Item) {
+generate_enum_decl :: (ctx: *CodegenContext, item: *Item) {
 
   enum_name: *char = get_str(ctx.interner, item.ident.name);
   module: *Module = ctx.current_module;
+  data: EnumData = item.node._enum;
 
   emit_line_directive(ctx.out, ctx.source, item.span);
   fprintf(ctx.out, "typedef enum");
   mangle_path_and_ident(ctx, module.path, item.ident);
-  fprintf(ctx.out, " {\n");
+  fprintf(ctx.out, "__kind {\n");
   i: u32 = 0;
-
-  data: EnumData = item.node._enum;
 
   while i < data.num_variants {
     variant_name: *char = get_str(ctx.interner, data.variants[i].ident.name);
@@ -386,16 +391,96 @@ generate_enum :: (ctx: *CodegenContext, item: *Item) {
   }
   fprintf(ctx.out, "}");
   mangle_path_and_ident(ctx, module.path, item.ident);
+  fprintf(ctx.out, "__kind;\n\n");
+
+}
+
+generate_enum :: (ctx: *CodegenContext, item: *Item) {
+
+  enum_name: *char = get_str(ctx.interner, item.ident.name);
+  module: *Module = ctx.current_module;
+  data: EnumData = item.node._enum;
+
+  i: u32 = 0;
+  while i < data.num_variants {
+    variant: *EnumVariant = &data.variants[i];
+    variant_name: *char = get_str(ctx.interner, variant.ident.name);
+
+    if variant.kind == VariantKind::Tuple {
+      fprintf(ctx.out, "typedef struct ")
+      mangle_path_and_ident(ctx, module.path, item.ident);
+      fprintf(ctx.out, "__%s__data {\n", variant_name);
+
+      j: u32 = 0;
+      while j < variant.data.num_elements {
+        generate_ty(ctx, variant.data.elements[j].ty);
+        fprintf(ctx.out, " _%d;\n", j);
+        j = j + 1;
+      }
+
+      fprintf(ctx.out, "} ");
+      mangle_path_and_ident(ctx, module.path, item.ident);
+      fprintf(ctx.out, "__%s__data;\n\n", variant_name);
+    }
+
+    i = i + 1;
+  }
+
+
+  fprintf(ctx.out, "typedef union");
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  fprintf(ctx.out, "__node {\n");
+
+  i = 0;
+  while i < data.num_variants {
+    variant: *EnumVariant = &data.variants[i];
+    if variant.kind == VariantKind::Tuple {
+      variant_name: *char = get_str(ctx.interner, variant.ident.name);
+      mangle_path_and_ident(ctx, module.path, item.ident);
+      fprintf(ctx.out, "__%s__data %s;\n", variant_name, variant_name);
+    }
+    i = i + 1;
+  }
+
+  fprintf(ctx.out, "}");
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  fprintf(ctx.out, "__node;\n\n");
+
+  fprintf(ctx.out, "typedef struct");
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  fprintf(ctx.out, " {\n");
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  fprintf(ctx.out, "__kind kind;\n");
+  mangle_path_and_ident(ctx, module.path, item.ident);
+  fprintf(ctx.out, "__node node;\n");
+  fprintf(ctx.out, "}");
+  mangle_path_and_ident(ctx, module.path, item.ident);
   fprintf(ctx.out, ";\n\n");
 
   i = 0;
   while i < data.num_variants {
-    variant_name: *char = get_str(ctx.interner, data.variants[i].ident.name);
+    variant: *EnumVariant = &data.variants[i];
+
+    variant_name: *char = get_str(ctx.interner, variant.ident.name);
+
     mangle_path_and_ident(ctx, module.path, item.ident);
     fprintf(ctx.out, " %s_%s_create(", enum_name, variant_name);
-
+    j: u32 = 0;
+    while j < variant.data.num_elements {
+      generate_ty(ctx, variant.data.elements[j].ty);
+      fprintf(ctx.out, " _%u", j);
+      if j + 1 != variant.data.num_elements  fprintf(ctx.out, ",");
+      j = j + 1;
+    }
     fprintf(ctx.out, " ) {\n");
-    fprintf(ctx.out, "return %s_%s;\n}\n", enum_name, variant_name);
+    mangle_path_and_ident(ctx, module.path, item.ident);
+    fprintf(ctx.out, " e; e.kind = %s_%s;\n", enum_name, variant_name);
+    j = 0;
+    while j < variant.data.num_elements {
+      fprintf(ctx.out, "_%u = _%u;\n", j, j);
+      j = j + 1;
+    }
+    fprintf(ctx.out, "return e;\n}\n\n")
     i = i + 1;
   }
 }
@@ -451,7 +536,7 @@ generate_mod_type_decl :: (ctx: *CodegenContext, module: *Module) {
   i: u32 = 0;
   while i < module.num_items {
     item: *Item = &module.items[i];
-    if item.kind == ItemKind::Enum   generate_enum(ctx, item);
+    if item.kind == ItemKind::Enum   generate_enum_decl(ctx, item);
     else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  generate_compound_decl(ctx, item);
     i = i + 1;
   }
@@ -463,6 +548,7 @@ generate_mod_type_defs :: (ctx: *CodegenContext, module: *Module) {
   while i < module.num_items {
     item: *Item = &module.items[i];
     if item.kind == ItemKind::Const || item.kind == ItemKind::Variable  generate_variable(ctx, item);
+    else if item.kind == ItemKind::Enum   generate_enum(ctx, item);
     else if item.kind == ItemKind::Struct || item.kind == ItemKind::Union  generate_compound(ctx, item);
     i = i + 1;
   }
