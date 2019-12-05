@@ -50,7 +50,7 @@ generate_identifier :: (ctx: *CodegenContext, ident: Ident) {
 }
 
 generate_pattern :: (ctx: *CodegenContext, pat: Pattern) {
-  generate_identifier(ctx, pat.ident);
+  generate_identifier(ctx, pat.path.segments[0]);
 }
 
 mangle_path :: (ctx: *CodegenContext, path: Path) {
@@ -208,6 +208,10 @@ generate_conditional :: (ctx: *CodegenContext, cond: ConditionalData) {
   }
 }
 
+generate_match :: (ctx: *CodegenContext, data: MatchData) {
+  //TODO
+}
+
 generate_while :: (ctx: *CodegenContext, data: WhileData) {
   fprintf(ctx.out, "while ( ");
   generate_expr(ctx, data.condition);
@@ -265,7 +269,7 @@ generate_local :: (ctx: *CodegenContext, data: LocalData) {
 
   generate_ty(ctx, data.ty);
 
-  var_name: *char = get_str(ctx.interner, data.pat.ident.name);
+  var_name: *char = get_str(ctx.interner, data.pat.path.segments[0].name);
 
   fprintf(ctx.out, " %s ", var_name);
   if data.value {
@@ -289,6 +293,7 @@ generate_expr :: (ctx: *CodegenContext, expr: *Expr) {
    else if expr.kind == ExprKind::Block  generate_block(ctx, expr.node.block);
    else if expr.kind == ExprKind::Call  generate_call(ctx, expr.node.call);
    else if expr.kind == ExprKind::Conditional  generate_conditional(ctx, expr.node.conditional);
+   else if expr.kind == ExprKind::Match  generate_match(ctx, expr.node._match);
    else if expr.kind == ExprKind::While  generate_while(ctx, expr.node.whl);
    else if expr.kind == ExprKind::Indexing  generate_indexing(ctx, expr.node.indexing);
    else if expr.kind == ExprKind::Field  generate_field(ctx, expr.node.field);
@@ -358,7 +363,7 @@ generate_function_decl :: (ctx: *CodegenContext, item: *Item) {
 
     generate_ty(ctx, ty);
 
-    param_name: *char = get_str(ctx.interner, header.parameters[i].pat.ident.name);
+    param_name: *char = get_str(ctx.interner, header.parameters[i].pat.path.segments[0].name);
     fprintf(ctx.out, " %s", param_name);
     if i < header.num_parameters - 1  fprintf(ctx.out, ", ");
     i = i + 1;

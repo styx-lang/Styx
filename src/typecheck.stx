@@ -410,6 +410,19 @@ check_conditional :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   return ctx.common._void;
 }
 
+check_match :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
+  data: *MatchData = &expr.node._match;
+
+  check_expr(ctx, data.condition);
+
+  i: u32 = 0;
+  while i < data.num_arms {
+    check_expr(ctx, data.arms[i].body);
+    i = i + 1;
+  }
+  return ctx.common._void;
+}
+
 check_while :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   data: WhileData = expr.node.whl;
   condition: *Expr = data.condition;
@@ -529,6 +542,7 @@ check_expr :: (ctx: *TypeContext, expr: *Expr) -> *Ty {
   else if expr.kind == ExprKind::ControlFlow  result = ctx.common._void;
   else if expr.kind == ExprKind::While  result = check_while(ctx, expr);
   else if expr.kind == ExprKind::Indexing  result = check_indexing(ctx, expr);
+  else if expr.kind == ExprKind::Match  result = check_match(ctx, expr);
   else if expr.kind == ExprKind::Field  result = check_field(ctx, expr);
   else if expr.kind == ExprKind::Path  result = check_path(ctx, &expr.node.path);
   else if expr.kind == ExprKind::Literal  result = ast_literal_to_ty(ctx, expr.node.lit);

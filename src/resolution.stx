@@ -318,6 +318,15 @@ resolve_conditional :: (ctx: *ResolutionContext, cond: ConditionalData) {
   }
 }
 
+resolve_match :: (ctx: *ResolutionContext, data: MatchData) {
+  resolve_expr(ctx, data.condition);
+  i: u32 = 0;
+  while i < data.num_arms {
+    resolve_expr(ctx, data.arms[i].body);
+    i = i + 1;
+  }
+}
+
 resolve_while :: (ctx: *ResolutionContext, data: WhileData) {
   resolve_expr(ctx, data.condition);
   resolve_expr(ctx, data.body);
@@ -349,7 +358,7 @@ resolve_block :: (ctx: *ResolutionContext, block: *Block) {
 }
 
 resolve_local :: (ctx: *ResolutionContext, data: *LocalData) {
-  push_local(ctx, data.pat.ident, data);
+  push_local(ctx, data.pat.path.segments[0], data);
   resolve_type(ctx, data.ast_ty);
   if data.value  resolve_expr(ctx, data.value);
 }
@@ -369,6 +378,7 @@ resolve_expr :: (ctx: *ResolutionContext, expr: *Expr) {
   else if expr.kind == ExprKind::Block  resolve_block(ctx, expr.node.block);
   else if expr.kind == ExprKind::Call  resolve_call(ctx, expr.node.call);
   else if expr.kind == ExprKind::Conditional  resolve_conditional(ctx, expr.node.conditional);
+  else if expr.kind == ExprKind::Match  resolve_match(ctx, expr.node._match);
   else if expr.kind == ExprKind::While  resolve_while(ctx, expr.node.whl);
   else if expr.kind == ExprKind::Indexing  resolve_indexing(ctx, expr.node.indexing);
   else if expr.kind == ExprKind::Field  resolve_field(ctx, expr.node.field);
@@ -399,7 +409,7 @@ resolve_function :: (ctx: *ResolutionContext, item: *Item) {
     i: u32 = 0;
     while i < func.header.num_parameters {
       param: *FunctionParameter = &func.header.parameters[i];
-      push_parameter(ctx, param.pat.ident, param);
+      push_parameter(ctx, param.pat.path.segments[0], param);
 
       i = i + 1;
     }

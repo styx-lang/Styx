@@ -26,6 +26,18 @@ main :: () -> i32 {
   u_b: UnitEnum = UnitEnum::B;
   printf("%u %u %u %u\n", u_a == u_a, u_a == u_b, u_b == UnitEnum::B, u_a == UnitEnum::C);
 
+  flag: bool = false
+
+  match u_a {
+    UnitEnum::A => {
+      printf("u_a = A\n");
+      flag = true;
+    }
+    UnitEnum::B => printf("u_a = B\n");
+    default => printf("u_a = Other\n");
+  }
+
+
   t_a: TupleEnum = TupleEnum::A(12);
   t_b: TupleEnum = TupleEnum::B(12);
   t_c1: TupleEnum = TupleEnum::C(12, 42);

@@ -92,8 +92,6 @@ parse_path :: (ctx: *ParsingContext) -> Path {
   path.span.from = span_start(ctx);
 
   while true {
-    if accept(ctx, TokenKind::Star)  break; //TODO: Remove
-
     path.segments[path.num_segments] = parse_identifier(ctx);
     if path.segments[path.num_segments].name.x == intern(ctx.interner, "self").x || path.segments[path.num_segments].name.x == intern(ctx.interner, "super").x {}
     else path.num_segments = path.num_segments + 1;
@@ -116,7 +114,7 @@ parse_path_expr :: (ctx: *ParsingContext) -> *Expr {
 parse_pattern :: (ctx: *ParsingContext) -> Pattern {
   pat: Pattern;
   pat.span.from = span_start(ctx);
-  pat.ident = parse_identifier(ctx);
+  pat.path = parse_path(ctx);
   pat.span.to = span_end(ctx);
   return pat;
 }
@@ -439,6 +437,38 @@ parse_if :: (ctx: *ParsingContext) -> *Expr {
   return expr;
 }
 
+parse_arm :: (ctx: *ParsingContext) -> Arm {
+  arm: Arm;
+  arm.span.from = span_start(ctx);
+  arm.pattern = parse_pattern(ctx);
+  expect(ctx, TokenKind::ThickArrow);
+  arm.body = parse_block_expr(ctx);
+  arm.span.to = span_start(ctx);
+
+  return arm;
+}
+
+parse_match :: (ctx: *ParsingContext) -> *Expr {
+
+  expect(ctx, TokenKind::Match);
+
+  expr: *Expr = create_expr(ExprKind::Match);
+  data: *MatchData = &expr.node._match;
+  data.condition = parse_expression(ctx, 0);
+
+
+  data.arms = malloc(sizeof(Arm) * 32);
+
+  expect(ctx, TokenKind::LeftCurly);
+
+  while !accept(ctx, TokenKind::RightCurly) {
+    data.arms[data.num_arms] = parse_arm(ctx);
+    data.num_arms = data.num_arms + 1;
+  }
+
+  return expr;
+}
+
 parse_while :: (ctx: *ParsingContext) -> *Expr {
   expect(ctx, TokenKind::While);
 
@@ -520,6 +550,7 @@ parse_expression :: (ctx: *ParsingContext, precedence: u32) -> *Expr {
   else if (tok.kind == TokenKind::Minus || tok.kind == TokenKind::Bang ||
            tok.kind == TokenKind::And || tok.kind == TokenKind::Star) left = parse_prefix_operator(ctx);
   else if tok.kind == TokenKind::If  left = parse_if(ctx);
+  else if tok.kind == TokenKind::Match  left = parse_match(ctx);
   else if tok.kind == TokenKind::Cast  left = parse_cast(ctx);
   else if tok.kind == TokenKind::Sizeof  left = parse_sizeof(ctx);
   else if tok.kind == TokenKind::Identifier  left = parse_path_expr(ctx);

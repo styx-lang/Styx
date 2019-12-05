@@ -159,7 +159,7 @@ Ty :: struct {
 }
 
 Pattern :: struct {
-  ident: Ident,
+  path: Path,
   span: Span,
 }
 
@@ -277,6 +277,18 @@ ConditionalData :: struct {
   otherwise: *Expr,
 }
 
+Arm :: struct {
+  span: Span,
+  pattern: Pattern,
+  body: *Expr,
+}
+
+MatchData :: struct {
+  condition: *Expr,
+  arms: *Arm,
+  num_arms: u32,
+}
+
 WhileData :: struct {
   condition: *Expr,
   body: *Expr,
@@ -318,6 +330,7 @@ ExprKind :: enum {
   Field,
   Indexing,
   Path,
+  Match,
   Literal,
   Sizeof,
   Unary,
@@ -340,6 +353,7 @@ ExprKindNode :: union {
   field: FieldData,
   indexing: IndexingData,
   path: Path,
+  _match: MatchData,
   lit: Literal,
   _sizeof: *Expr,
   unary: UnaryData,
